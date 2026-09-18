@@ -1,15 +1,53 @@
 # Learn Hebrew and Greek
 
-Reference data and tools for studying the original languages behind the KJV.
-Everything runs with Python 3 alone. Nothing to install.
+An app for learning to read the Hebrew Bible, plus the reference data behind it.
+Everything runs with Python 3 and a web browser. Nothing to install.
 
-## What is here
+## The app: Read the Hebrew Bible
+
+Open `app/index.html` in any browser. It works from a double-click, no server needed,
+and it is laid out for a phone.
+
+How it teaches:
+
+1. **Words in frequency order.** The 2,388 Hebrew words that occur ten or more times,
+   starting with the eight inseparable prefixes (and, the, in, to, from, like...). Together
+   they cover 94.5 percent of every word in the Hebrew Bible. Each card shows the word,
+   its transliteration, a short gloss, its grammar, how the KJV renders it, and a real verse.
+2. **Spaced repetition.** Grade each card Again, Hard, Good or Easy. Intervals grow the way
+   Anki's do (SM-2 with two learning steps). Ten new words a day by default; change it on Home.
+3. **Real verses, as soon as you can read them.** The reading ladder holds 2,047 short
+   verses ranked by their rarest word. A verse is "ready" when you have started every word
+   in it, so the list grows with your vocabulary. Tap any word for its gloss, grammar,
+   and the KJV phrase that translates it. Reveal the English when you want to check.
+4. **Bible truths, verse by verse.** Fifteen topics, 429 verse slots: the character of God,
+   His promises, creation, the Sabbath, the law, the state of the dead, the second coming,
+   the Messiah, the sanctuary, the great controversy, prophecy, the judgment, the new earth,
+   health and stewardship, prayer. The list is in `hebrew/curated.json`; edit it and rebuild.
+   Verses can be added to your reviews as whole-verse cards.
+
+Progress is saved in the browser. Export it from Home before changing phones.
+
+### Rebuilding the data
+
+```
+git clone --depth 1 https://github.com/openscriptures/morphhb
+curl -o TBESH.txt "https://raw.githubusercontent.com/STEPBible/STEPBible-Data/master/Lexicons/TBESH%20-%20Translators%20Brief%20lexicon%20of%20Extended%20Strongs%20for%20Hebrew%20-%20STEPBible.org%20CC%20BY.txt"
+python3 hebrew/build_hebrew.py morphhb/wlc TBESH.txt
+```
+
+That rewrites `app/data/`. Edit `hebrew/curated.json` first to change the topics or verses.
+
+## Reference data and tools
 
 | Path | Contents |
 |---|---|
 | `strongs/strongs-hebrew.json` | Strong's Hebrew dictionary, H1 through H8674 (8,674 entries). |
 | `strongs/strongs-greek.json` | Strong's Greek dictionary, G1 through G5624 (5,523 entries; Strong's numbering has gaps). |
 | `strongs/lookup.py` | Dictionary lookup by number or by word. Prints plain text you can paste into a post. |
+| `app/` | The Hebrew reading app. `index.html`, `app.js`, `style.css`, and the built data in `app/data/`. |
+| `hebrew/build_hebrew.py` | Builds `app/data/` from the tagged Hebrew text and the lexicon. |
+| `hebrew/curated.json` | The topic-by-topic verse list the app teaches from. |
 | `kjv/kjv-strongs.txt` | The whole KJV, one verse per line, every phrase tagged with its Strong's number. 31,102 verses. |
 | `kjv/concordance.py` | Occurrence lists: every verse where a Strong's number appears, with the word marked. |
 | `kjv/kjvtext.py` | Shared reader used by the two scripts. |
@@ -75,6 +113,13 @@ A phrase with two numbers in its braces translates two original words at once.
 
 ## Sources and licenses
 
+- Hebrew text: Westminster Leningrad Codex with Strong's numbers and morphology, from the
+  OpenScriptures morphhb project (https://github.com/openscriptures/morphhb), CC BY 4.0.
+  The verse map in the same project aligns Hebrew and KJV verse numbering.
+- Glosses, lemma forms and transliterations: TBESH, the Translators Brief lexicon of
+  Extended Strongs for Hebrew, by Tyndale House Cambridge via STEPBible
+  (https://github.com/STEPBible/STEPBible-Data), CC BY 4.0. Only the gloss, form,
+  transliteration and word-type columns are used.
 - James Strong's dictionaries (Hebrew 1894, Greek 1890) are public domain. The JSON
   files come from the Open Scriptures project's XML edition
   (https://github.com/openscriptures/strongs), CC-BY-SA. The only change made here

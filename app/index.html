@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Read the Hebrew Bible</title>
+<meta name="description" content="Learn Biblical Hebrew by frequency and spaced repetition, reading real verses as soon as you know their words.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Lato:wght@300;400;700&family=Noto+Serif+Hebrew:wght@400;600&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <div class="eyebrow">Learn Hebrew</div>
+    <h1 class="wordmark">Read the Bible</h1>
+  </div>
+  <nav class="tabs" id="tabs">
+    <a href="#home" data-tab="home">Home</a>
+    <a href="#learn" data-tab="learn">Learn</a>
+    <a href="#review" data-tab="review">Review <span class="badge" id="due-badge" hidden></span></a>
+    <a href="#read" data-tab="read">Read</a>
+  </nav>
+</header>
+
+<main id="view" class="view"></main>
+
+<div id="sheet" class="sheet" hidden>
+  <div class="sheet-card">
+    <button class="sheet-close" id="sheet-close" aria-label="Close">×</button>
+    <div id="sheet-body"></div>
+  </div>
+</div>
+
+<script src="data/vocab.js"></script>
+<script src="data/lexicon.js"></script>
+<script src="data/verses.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
