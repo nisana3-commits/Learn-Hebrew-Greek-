@@ -290,11 +290,19 @@ def kjv_phrases(tagged):
 
 # ---------- reference parsing ----------
 
-def expand_ref(ref):
-    """'Ps 103:8-13' -> ['Ps.103.8', ..., 'Ps.103.13'] (KJV numbering)"""
-    m = re.fullmatch(r"(\S+) (\d+):(\d+)(?:-(\d+))?", ref)
-    b, c, v1, v2 = m.group(1), int(m.group(2)), int(m.group(3)), m.group(4)
-    v2 = int(v2) if v2 else v1
+def expand_ref(ref, kjv):
+    """'Ps 103:8-13' -> ['Ps.103.8', ..., 'Ps.103.13']; 'Ps 103' -> the whole chapter (KJV numbering)"""
+    m = re.fullmatch(r"(\S+) (\d+)(?::(\d+)(?:-(\d+))?)?", ref)
+    if not m:
+        raise ValueError("bad reference: " + ref)
+    b, c = m.group(1), int(m.group(2))
+    if m.group(3) is None:
+        name = OSIS_TO_KJV[b]
+        n = max(int(k.split(":")[1]) for k in kjv if k.startswith(f"{name} {c}:"))
+        v1, v2 = 1, n
+    else:
+        v1 = int(m.group(3))
+        v2 = int(m.group(4)) if m.group(4) else v1
     return [f"{b}.{c}.{v}" for v in range(v1, v2 + 1)]
 
 
@@ -405,13 +413,15 @@ def main(wlc_dir, tbesh_path):
                         phrase_word[i] = len(words)
                         break
             m, c = both_translits(w["raw"], e["translit"] if e else "", w.get("mq", False))
-            words.append({
-                "h": w["h"], "parts": w["parts"], "pfx": w["pfx"], "key": w["key"],
-                "gloss": e["gloss"] if e else "", "translit": m, "translitW": c,
-                "morph": decode_morph(w["morph"]), "eng": eng,
-                "mq": w.get("mq", False), "end": w.get("end", False),
-                "name": is_name(w["key"]) if w["key"] else False,
-            })
+            # compact record; the app derives h, gloss, eng and the grammar description on load
+            rec = {"parts": w["parts"], "pfx": w["pfx"], "key": w["key"], "translit": m, "translitW": c, "m": w["morph"]}
+            if w.get("mq"):
+                rec["mq"] = True
+            if w.get("end"):
+                rec["end"] = True
+            if w["key"] and is_name(w["key"]):
+                rec["name"] = True
+            words.append(rec)
         # KJV text as segments: [text, index of the Hebrew word it translates or None]
         seg = []
         pos = 0
@@ -425,11 +435,13 @@ def main(wlc_dir, tbesh_path):
             seg.append([tail, None])
         lvl, unknown = verse_level(osis)
         b, c, v = osis.split(".")
-        return {"id": osis, "ref": f"{OSIS_TO_KJV[b]} {c}:{v}", "seg": seg,
-                "kjvRef": kref if kref != f"{OSIS_TO_KJV[b]} {c}:{v}" else None,
-                "kjv": kjv_plain(tagged), "words": words, "level": lvl,
-                "unknown": unknown, "aramaic": any(w["morph"].startswith("A") for w in verses[osis]),
-                "topics": [topic] if topic else []}
+        rec = {"id": osis, "ref": f"{OSIS_TO_KJV[b]} {c}:{v}", "seg": seg, "words": words, "level": lvl,
+               "unknown": unknown, "topics": [topic] if topic else []}
+        if kref != rec["ref"]:
+            rec["kjvRef"] = kref
+        if any(w["morph"].startswith("A") for w in verses[osis]):
+            rec["aramaic"] = True
+        return rec
 
     # curated topic verses
     curated = json.load(open(CURATED, encoding="utf-8"))
@@ -438,19 +450,23 @@ def main(wlc_dir, tbesh_path):
     missing = []
     for t in curated["topics"]:
         ids = []
-        for ref in t["refs"]:
-            for k in expand_ref(ref):
-                wl = kjv_to_wlc.get(k, [])
-                if not wl:
-                    missing.append(k)
-                    continue
-                for osis in wl:
-                    if osis not in out_verses:
-                        out_verses[osis] = build_verse(osis, t["id"])
-                    elif t["id"] not in out_verses[osis]["topics"]:
-                        out_verses[osis]["topics"].append(t["id"])
-                    if osis not in ids:
-                        ids.append(osis)
+        for group, star in ((t["refs"], True), (t.get("passages", []), False)):
+            for ref in group:
+                for k in expand_ref(ref, kjv):
+                    wl = kjv_to_wlc.get(k, [])
+                    if not wl:
+                        missing.append(k)
+                        continue
+                    for osis in wl:
+                        if osis not in out_verses:
+                            out_verses[osis] = build_verse(osis, t["id"])
+                        elif t["id"] not in out_verses[osis]["topics"]:
+                            out_verses[osis]["topics"].append(t["id"])
+                        if star:
+                            out_verses[osis]["star"] = True
+                        if osis not in ids:
+                            ids.append(osis)
+        ids.sort(key=lambda o: (BOOK_ORDER[o.split(".")[0]], int(o.split(".")[1]), int(o.split(".")[2])))
         topics.append({"id": t["id"], "title": t["title"], "blurb": t["blurb"], "verses": ids})
     if missing:
         print("WARNING: no Hebrew verse found for", missing)

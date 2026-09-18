@@ -271,3 +271,4 @@ input#guess.shake { animation: shake 400ms; }
 .list.words .heb { flex: 0 0 auto; min-width: 90px; text-align: right; }
 .list.words .right { margin-left: auto; white-space: nowrap; }
 .search { width: 100%; font: 16px var(--font-text); padding: 10px 14px; border: 1.5px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--text); margin-bottom: 8px; }
+.verse-en .pill { text-decoration: none; font-size: 11px; }

@@ -17,18 +17,22 @@ How it teaches:
    meaning before the answer appears. You judge yourself: Missed or Got it. Five dots
    track your streak on that word.
 3. **Then the word in Scripture.** After every answer the app shows five verses that
-   contain the word, in English, with the word itself in Hebrew where it falls. Every word
-   you have answered right twice before also appears in Hebrew, so the verses turn into
-   Hebrew as your vocabulary grows. Tap any Hebrew word to hear it and see its grammar.
+   contain the word, in English, with the word itself in Hebrew where it falls. The verses
+   come from the Bible-truth topics first: the key texts, then the passages they sit in,
+   and only then the reading ladder. Every word you have answered right twice before also
+   appears in Hebrew, so the verses turn into Hebrew as your vocabulary grows. Tap any
+   Hebrew word to hear it and see its grammar.
 4. **Spaced repetition.** Intervals grow the way Anki's do (SM-2 with two learning steps)
    and a miss brings the word back within minutes. Ten new words a day by default.
 5. **Real verses to read.** The reading ladder holds 2,884 short verses ranked by their
    rarest word; a verse is "ready" when you have started every word in it. Fifteen
-   Bible-truth topics with 429 verse slots (the character of God, His promises, creation,
+   Bible-truth topics hold 2,726 verses (the character of God, His promises, creation,
    the Sabbath, the law, the state of the dead, the second coming, the Messiah, the
    sanctuary, the great controversy, prophecy, the judgment, the new earth, health and
-   stewardship, prayer) sit in `hebrew/curated.json`; edit it and rebuild. Whole verses
-   can be added to your reviews as cards.
+   stewardship, prayer): 404 starred key texts plus the chapters and passages they come
+   from, such as Exodus 20, Isaiah 53, Ecclesiastes 9, Daniel 12 and Psalm 91. The list
+   is `hebrew/curated.json`; a reference like "Ps 103" means the whole chapter. Edit it
+   and rebuild. Whole verses can be added to your reviews as cards.
 
 **Transliteration.** Every word is transliterated from its own pointed form by
 `hebrew/translit.py`, in two styles. Classical (the default) follows the SBL academic

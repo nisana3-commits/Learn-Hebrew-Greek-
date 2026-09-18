@@ -11,6 +11,55 @@
   const LEX = window.HEB_LEXICON;
   const VOCAB_BY_KEY = Object.fromEntries(VOCAB.map(v => [v.key, v]));
 
+  // ---------- expand the compact verse records ----------
+  const PREFIX_GLOSS = { c: "and, but", d: "the", b: "in, with, by", l: "to, for", m: "from, out of", k: "like, as", s: "who, which, that", i: "[question marker]" };
+  const STEMS_H = { q: "Qal", N: "Niphal", p: "Piel", P: "Pual", h: "Hiphil", H: "Hophal", t: "Hithpael", o: "Polel", O: "Polal", r: "Hithpolel", m: "Poel", M: "Poal", k: "Palel", K: "Pulal", Q: "Qal passive", l: "Pilpel", L: "Polpal", f: "Hithpalpel", D: "Nithpael", j: "Pealal", i: "Pilel", u: "Hothpaal", c: "Tiphil", v: "Hishtaphel", w: "Nithpalel", y: "Nithpoel", z: "Hithpoel" };
+  const STEMS_A = { q: "Peal", Q: "Peil", u: "Hithpeel", p: "Pael", P: "Ithpaal", M: "Hithpaal", a: "Aphel", h: "Haphel", s: "Saphel", e: "Shaphel", H: "Hophal", i: "Ithpeel", t: "Hishtaphel", v: "Ishtaphel", w: "Hithaphel", o: "Polel", z: "Ithpoel", r: "Hithpolel", f: "Hithpalpel", b: "Hephal", c: "Tiphel", m: "Poel", l: "Palpel", L: "Ithpalpel", O: "Ithpolel", G: "Ittaphal" };
+  const VTYPES = { p: "perfect", q: "sequential perfect", i: "imperfect", w: "sequential imperfect", h: "cohortative", j: "jussive", v: "imperative", r: "participle", s: "passive participle", a: "infinitive absolute", c: "infinitive construct" };
+  const GENDER = { m: "masc.", f: "fem.", b: "both", c: "common" }, NUMBER = { s: "sing.", p: "plur.", d: "dual" }, STATE = { a: "absolute", c: "construct", d: "determined" };
+  const PRONOUN = { d: "demonstrative", f: "indefinite", i: "interrogative", p: "personal", r: "relative" };
+  const PARTICLE = { a: "affirmation", d: "article", e: "exclamation", i: "interrogative", j: "interjection", m: "negative", o: "object marker", r: "relative" };
+  const ADJ = { a: "adjective", c: "cardinal number", o: "ordinal number", g: "gentilic" }, NOUN = { c: "noun", g: "gentilic noun", p: "proper noun" };
+  const SUFFIX = { "1cs": "me / my", "1cp": "us / our", "2ms": "you / your (m.)", "2fs": "you / your (f.)", "2mp": "you / your (m. pl.)", "2fp": "you / your (f. pl.)", "3ms": "him / his", "3fs": "her", "3mp": "them / their (m.)", "3fp": "them / their (f.)" };
+  function pgn(s) {
+    const out = [];
+    if ("123".includes(s[0] || "-")) { out.push({ 1: "1st", 2: "2nd", 3: "3rd" }[s[0]]); s = s.slice(1); }
+    if (GENDER[s[0]]) { out.push(GENDER[s[0]]); s = s.slice(1); }
+    if (NUMBER[s[0]]) { out.push(NUMBER[s[0]]); s = s.slice(1); }
+    if (STATE[s[0]]) out.push(STATE[s[0]]);
+    return out.join(" ");
+  }
+  function decodeMorph(code) {
+    const lang = code[0];
+    return code.slice(1).split("/").filter(Boolean).map(p => {
+      const c = p[0], rest = p.slice(1);
+      if (c === "R") return "preposition" + (rest === "d" ? " + the" : "");
+      if (c === "C") return "conjunction";
+      if (c === "D") return "adverb";
+      if (c === "T") return PARTICLE[rest] || "particle";
+      if (c === "N") return ((NOUN[rest[0]] || "noun") + " " + pgn(rest.slice(1))).trim();
+      if (c === "A") return ((ADJ[rest[0]] || "adjective") + " " + pgn(rest.slice(1))).trim();
+      if (c === "P") return ((PRONOUN[rest[0]] || "") + " pronoun " + pgn(rest.slice(1))).trim();
+      if (c === "V") { const st = (lang === "A" ? STEMS_A : STEMS_H)[rest[0]] || ""; return ["verb", st, VTYPES[rest[1]] || "", pgn(rest.slice(2))].filter(Boolean).join(" "); }
+      if (c === "S") return rest[0] === "p" ? "suffix: " + (SUFFIX[rest.slice(1)] || rest.slice(1)) : rest[0] === "d" ? "directional ending (toward)" : rest[0] === "h" ? "paragogic he" : rest[0] === "n" ? "paragogic nun" : "suffix";
+      return p;
+    });
+  }
+  for (const id in VERSES) {
+    const v = VERSES[id];
+    v.kjv = v.seg.map(s => s[0]).join("");
+    v.words.forEach((w, i) => {
+      w.h = w.parts.join("");
+      w.mq = !!w.mq; w.end = !!w.end; w.name = !!w.name;
+      const lex = w.key ? LEX[w.key] : null;
+      w.gloss = lex ? lex.gloss : (w.pfx.length ? w.pfx.map(p => PREFIX_GLOSS[p] || p).join(" + ") : "");
+      w.morph = decodeMorph(w.m);
+      w.eng = null;
+    });
+    for (const [t, wi] of v.seg) if (wi != null && v.words[wi].eng == null) v.words[wi].eng = t.trim();
+    v.kjvRef = v.kjvRef || null; v.aramaic = !!v.aramaic; v.star = !!v.star;
+  }
+
   const MIN = 60000, DAY = 86400000;
   const STORE_KEY = "hebrew-srs-v1";
 
@@ -251,7 +300,7 @@
     const v = VERSES[id];
     const n = newKeysInVerse(v).length + rareKeysInVerse(v).length;
     const badge = n === 0 ? `<span class="pill ok">Ready</span>` : `<span class="pill${n > 2 ? " gray" : ""}">${n} new</span>`;
-    return `<li data-act="open-verse" data-id="${id}"><span class="ref">${esc(v.ref)}</span><span class="heb">${esc(v.words.map(w => w.h).join(" "))}</span>${badge}</li>`;
+    return `<li data-act="open-verse" data-id="${id}"><span class="ref">${v.star ? "★ " : ""}${esc(v.ref)}</span><span class="heb">${esc(v.words.map(w => w.h).join(" "))}</span>${badge}</li>`;
   }
   function kjvBlock(v) {
     return `<div class="kjv"><span class="ref">${esc(v.ref)}${v.kjvRef ? " (KJV " + esc(v.kjvRef) + ")" : ""}</span>${esc(v.kjv)}</div>`;
@@ -370,9 +419,13 @@
     return a.slice(0, n);
   }
   const wordHas = (w, key) => key.startsWith("pfx:") ? w.pfx.includes(key.slice(4)) : keyBase(w.key) === keyBase(key);
+  // verses that carry the word: Bible-truth topic verses first, then the easiest ladder verses
   function versesForWord(key) {
-    return (INDEX[key] || []).filter(id => !VERSES[id].aramaic && VERSES[id].seg.some(([, wi]) => wi != null && wordHas(VERSES[id].words[wi], key)));
+    const all = (INDEX[key] || []).filter(id => !VERSES[id].aramaic && VERSES[id].seg.some(([, wi]) => wi != null && wordHas(VERSES[id].words[wi], key)));
+    return { key: all.filter(id => VERSES[id].star), topical: all.filter(id => VERSES[id].topics.length && !VERSES[id].star),
+             rest: all.filter(id => !VERSES[id].topics.length).slice(0, 24) };
   }
+  const TOPIC_TITLE = Object.fromEntries(TOPICS.map(t => [t.id, t.title]));
   // English verse with the target word, and every practiced word, shown in Hebrew
   function renderSwappedVerse(v, targetKey) {
     let swapped = 0;
@@ -446,15 +499,19 @@
   function renderVersesPhase() {
     const key = study.key;
     const v = VOCAB_BY_KEY[key] || LEX[key] || {};
-    const all = versesForWord(key).slice(0, 24);
-    const pick = seededPick(all, 5, study.shuffle);
+    const { key: keyVerses, topical, rest } = versesForWord(key);
+    const pick = seededPick(keyVerses, 5, study.shuffle);
+    if (pick.length < 5) pick.push(...seededPick(topical, 5 - pick.length, study.shuffle));
+    if (pick.length < 5) pick.push(...seededPick(rest, 5 - pick.length, study.shuffle));
+    const total = keyVerses.length + topical.length + rest.length;
     let anySwapped = false;
     const list = pick.map(id => {
       const vs = VERSES[id];
       const { html, swapped } = renderSwappedVerse(vs, key);
       if (swapped) anySwapped = true;
+      const topic = vs.topics.length ? `<a class="pill" href="#topic/${esc(vs.topics[0])}">${esc(TOPIC_TITLE[vs.topics[0]] || "")}</a>` : "";
       return `<div class="card verse-en" data-verse="${id}">
-        <div class="small muted eyebrow-label">${esc(vs.ref)}</div>
+        <div class="row between"><span class="small muted eyebrow-label">${esc(vs.ref)}</span>${topic}</div>
         <div class="en">${html}</div>
         <div class="vpanel-slot"></div>
       </div>`;
@@ -462,12 +519,12 @@
     return `<div class="center" style="margin-bottom:12px">
         <div class="heb heb-big">${esc(v.heb)}</div>
         <div class="gloss center">${esc(v.gloss)}</div>
-        <div class="small muted">See how this word is used in Scripture. Tap a Hebrew word to hear it.</div>
+        <div class="small muted">${keyVerses.length || topical.length ? "This word in the Bible truths you are studying." : "This word in Scripture."} Tap a Hebrew word to hear it.</div>
       </div>
       ${list || `<div class="card small muted">No verses in this app carry this word on its own yet.</div>`}
       ${anySwapped ? `<p class="small muted center">Words you have practiced appear in Hebrew too.</p>` : ""}
       <div class="row" style="justify-content:center">
-        ${all.length > 5 ? `<button class="btn" data-act="shuffle-verses">Different verses</button>` : ""}
+        ${total > 5 ? `<button class="btn" data-act="shuffle-verses">Different verses</button>` : ""}
         <button class="btn primary" data-act="continue">Continue</button>
       </div>`;
   }
@@ -537,7 +594,7 @@
     if (!t) return renderRead();
     return `<a class="btn quiet sm" href="#read">← All topics</a>
       <h2 style="margin:8px 0 4px">${esc(t.title)}</h2>
-      <p class="muted">${esc(t.blurb)}</p>
+      <p class="muted">${esc(t.blurb)} Starred verses are the key texts; the rest are the passages they come from.</p>
       <ul class="list">${t.verses.map(verseRow).join("")}</ul>`;
   }
 
