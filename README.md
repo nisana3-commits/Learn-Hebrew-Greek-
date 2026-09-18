@@ -10,13 +10,13 @@ and it is laid out for a phone.
 
 How it teaches:
 
-1. **Words in frequency order.** The 2,388 Hebrew words that occur ten or more times,
+1. **Words in frequency order.** The 3,507 Hebrew words that occur five or more times,
    starting with the eight inseparable prefixes (and, the, in, to, from, like...). Together
-   they cover 94.5 percent of every word in the Hebrew Bible. Each card shows the word,
+   they cover 97 percent of every word in the Hebrew Bible. Each card shows the word,
    its transliteration, a short gloss, its grammar, how the KJV renders it, and a real verse.
 2. **Spaced repetition.** Grade each card Again, Hard, Good or Easy. Intervals grow the way
    Anki's do (SM-2 with two learning steps). Ten new words a day by default; change it on Home.
-3. **Real verses, as soon as you can read them.** The reading ladder holds 2,047 short
+3. **Real verses, as soon as you can read them.** The reading ladder holds 2,884 short
    verses ranked by their rarest word. A verse is "ready" when you have started every word
    in it, so the list grows with your vocabulary. Tap any word for its gloss, grammar,
    and the KJV phrase that translates it. Reveal the English when you want to check.

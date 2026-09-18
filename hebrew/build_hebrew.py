@@ -13,7 +13,7 @@ Usage:
   python3 hebrew/build_hebrew.py path/to/morphhb/wlc path/to/TBESH.txt
 
 Outputs:
-  app/data/vocab.json    frequency-ordered vocabulary (lemmas seen 10+ times, plus prefixes)
+  app/data/vocab.json    frequency-ordered vocabulary (lemmas seen MIN_COUNT+ times, plus prefixes)
   app/data/verses.json   curated topic verses and the reading ladder, word by word
   app/data/lexicon.json  short glosses for every lemma that appears in verses.json
 """
@@ -45,6 +45,8 @@ OSIS_TO_KJV = dict(BOOKS)
 BOOK_ORDER = {b: i for i, (b, _) in enumerate(BOOKS)}
 
 # Inseparable prefixes as tagged in the WLC lemma field.
+MIN_COUNT = 5  # a lemma joins the vocabulary list at this many occurrences
+
 PREFIXES = {
     "c": ("וְ", "ve", "and, but", "conjunction"),
     "d": ("הַ", "ha", "the", "article"),
@@ -322,7 +324,7 @@ def main(wlc_dir, tbesh_path):
             vocab.append({"key": "pfx:" + p, "heb": heb, "translit": tr, "gloss": gloss,
                           "type": typ, "count": n, "prefix": True})
     for key, n in freq.most_common():
-        if n < 10:
+        if n < MIN_COUNT:
             break
         e = lex_lookup(lex, key)
         if not e:
