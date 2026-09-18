@@ -256,13 +256,14 @@
       </div>
       <div class="section-title">Settings</div>
       <div class="card stack small">
-        <label class="opt">New words per day <input type="number" min="1" max="100" value="${S.settings.newPerDay}" data-act="set-new-per-day"></label>
-        <label class="opt"><input type="checkbox" ${S.settings.highlightNew ? "checked" : ""} data-act="toggle-highlight"> Colour words I have not started yet in rose</label>
+        <label class="opt" for="new-per-day">New words per day <input id="new-per-day" type="number" min="1" max="100" value="${S.settings.newPerDay}" data-act="set-new-per-day"></label>
+        <label class="opt" for="highlight-new"><input id="highlight-new" type="checkbox" ${S.settings.highlightNew ? "checked" : ""} data-act="toggle-highlight"> Colour words I have not started yet in rose</label>
         <div class="row">
           <button class="btn sm" data-act="export">Export progress</button>
-          <label class="btn sm">Import <input type="file" accept="application/json" data-act="import" hidden></label>
+          <button class="btn sm" data-act="import">Import</button>
           <button class="btn sm quiet" data-act="reset">Reset everything</button>
         </div>
+        <div id="io-box" hidden></div>
         <p class="muted">Progress is stored in this browser only. Export a copy before switching phones or clearing site data.</p>
       </div>
       <div class="section-title">Sources</div>
@@ -461,20 +462,41 @@
     else if (act === "start-verse") { startVerse(el.dataset.id); route(); }
     else if (act === "learn-verse-words") { for (const k of newKeysInVerse(VERSES[el.dataset.id])) startWord(k, false); route(); }
     else if (act === "export") {
-      const blob = new Blob([JSON.stringify(S, null, 1)], { type: "application/json" });
-      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "hebrew-progress-" + today() + ".json"; a.click();
+      const box = document.getElementById("io-box");
+      box.hidden = false;
+      box.innerHTML = `<p class="small muted">Copy this text somewhere safe (a note, an email to yourself). Paste it back with Import on another device.</p><textarea class="io" id="io-text" readonly>${esc(JSON.stringify(S))}</textarea><div class="row"><button class="btn sm" data-act="copy-io">Copy</button><button class="btn sm quiet" data-act="close-io">Close</button></div>`;
+      document.getElementById("io-text").select();
     }
-    else if (act === "reset") { if (confirm("Delete all progress in this browser?")) { S = defaults(); save(); route(); } }
+    else if (act === "import") {
+      const box = document.getElementById("io-box");
+      box.hidden = false;
+      box.innerHTML = `<p class="small muted">Paste an export here.</p><textarea class="io" id="io-text" placeholder="{&quot;cards&quot;: ...}"></textarea><div class="row"><button class="btn sm primary" data-act="load-io">Load</button><button class="btn sm quiet" data-act="close-io">Close</button></div><div id="io-msg" class="small"></div>`;
+    }
+    else if (act === "copy-io") {
+      const t = document.getElementById("io-text"); t.select();
+      const done = () => { el.textContent = "Copied"; };
+      if (navigator.clipboard) navigator.clipboard.writeText(t.value).then(done, () => document.execCommand("copy") && done());
+      else if (document.execCommand("copy")) done();
+    }
+    else if (act === "load-io") {
+      const msg = document.getElementById("io-msg");
+      try {
+        const d = JSON.parse(document.getElementById("io-text").value);
+        if (d && d.cards) { S = Object.assign(defaults(), d); save(); route(); }
+        else msg.textContent = "That text is not an export from this app.";
+      } catch (err) { msg.textContent = "Could not read that text. Paste the whole export."; }
+    }
+    else if (act === "close-io") { document.getElementById("io-box").hidden = true; }
+    else if (act === "reset") {
+      if (el.dataset.confirm) { S = defaults(); save(); route(); }
+      else { el.dataset.confirm = "1"; el.textContent = "Tap again to erase all progress"; }
+    }
   });
   document.body.addEventListener("change", e => {
     const el = e.target.closest("[data-act]");
     if (!el) return;
     if (el.dataset.act === "set-new-per-day") { S.settings.newPerDay = Math.max(1, Math.min(100, +el.value || 10)); save(); }
     else if (el.dataset.act === "toggle-highlight") { S.settings.highlightNew = el.checked; save(); route(); }
-    else if (el.dataset.act === "import") {
-      const f = el.files[0]; if (!f) return;
-      f.text().then(t => { try { const d = JSON.parse(t); if (d && d.cards) { S = Object.assign(defaults(), d); save(); route(); alert("Progress imported."); } else alert("That file does not look like an export from this app."); } catch (err) { alert("Could not read that file."); } });
-    }
   });
   window.addEventListener("hashchange", route);
   route();
