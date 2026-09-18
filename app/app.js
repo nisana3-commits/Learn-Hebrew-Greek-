@@ -15,7 +15,7 @@
   const STORE_KEY = "hebrew-srs-v1";
 
   // ---------- state ----------
-  const defaults = () => ({ cards: {}, deferred: {}, settings: { newPerDay: 10, highlightNew: true }, log: {} });
+  const defaults = () => ({ cards: {}, deferred: {}, settings: { newPerDay: 10, highlightNew: true, autoSpeak: true, speakRate: 0.75 }, log: {} });
   let S = load();
   function load() {
     try { const raw = localStorage.getItem(STORE_KEY); if (raw) return Object.assign(defaults(), JSON.parse(raw)); } catch (e) { /* ignore */ }
@@ -69,6 +69,45 @@
     if (d < 365) return Math.round(d / 30) + " mo";
     return (d / 365).toFixed(1) + " y";
   }
+
+
+  // ---------- speech (the device's own Hebrew voice) ----------
+  const SPEAK_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M4 9v6h4l5 4V5L8 9H4zm11.5 3a3.5 3.5 0 0 0-2-3.15v6.3a3.5 3.5 0 0 0 2-3.15zM13.5 4.3v2.1a6 6 0 0 1 0 11.2v2.1a8 8 0 0 0 0-15.4z"/></svg>';
+  const speech = {
+    ok: typeof window.speechSynthesis !== "undefined" && typeof window.SpeechSynthesisUtterance !== "undefined",
+    voice: null, looked: false,
+    findVoice() {
+      if (!this.ok) return null;
+      const voices = window.speechSynthesis.getVoices();
+      this.looked = voices.length > 0;
+      const he = voices.filter(v => /^(he|iw)\b/i.test(v.lang));
+      // prefer a non-remote, higher quality voice when the device offers several
+      he.sort((a, b) => (b.localService === true) - (a.localService === true) || (/enhanced|premium|natural/i.test(b.name) - /enhanced|premium|natural/i.test(a.name)));
+      this.voice = he[0] || null;
+      return this.voice;
+    },
+    say(text) {
+      if (!this.ok) return false;
+      const v = this.voice || this.findVoice();
+      if (!v) return false;
+      const clean = text.replace(/[\u0591-\u05AF\u05BD\u05BF\u05C0\u05C3-\u05C6]/g, "").replace(/־/g, " ").replace(/׃/g, "");
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(clean);
+      u.voice = v; u.lang = v.lang; u.rate = S.settings.speakRate || 0.75;
+      window.speechSynthesis.speak(u);
+      return true;
+    },
+    status() {
+      if (!this.ok) return "This browser cannot speak text aloud.";
+      if (!this.voice) this.findVoice();
+      if (this.voice) return "Hebrew voice: " + this.voice.name + ".";
+      if (!this.looked) return "Voices are still loading. Tap a speaker in a moment.";
+      return "No Hebrew voice is installed on this device. iPhone: Settings, Accessibility, Spoken Content, Voices, Hebrew. Android: Settings, System, Languages, Text-to-speech, install Hebrew for Google Speech Services.";
+    },
+  };
+  if (speech.ok) { speech.findVoice(); window.speechSynthesis.addEventListener("voiceschanged", () => speech.findVoice()); setTimeout(() => { speech.looked = true; }, 2000); }
+  const speakBtn = (text, label) => `<button class="speak" type="button" data-act="speak" data-say="${esc(text)}" aria-label="${esc(label || "Pronounce")}" title="Pronounce">${SPEAK_ICON}</button>`;
+  function autoSpeak(text) { if (S.settings.autoSpeak && speech.voice) setTimeout(() => speech.say(text), 150); }
 
   // ---------- knowledge helpers ----------
   const wordCardId = key => "w:" + key;
@@ -187,7 +226,7 @@
     }
     return `<div class="wpanel">
       <div class="row between">
-        <div><span class="heb">${esc(w.h)}</span> <span class="translit">${esc(w.translit || lex.translit || "")}</span></div>
+        <div><span class="heb">${esc(w.h)}</span> <span class="translit">${esc(w.translit || lex.translit || "")}</span> ${speakBtn(w.h, "Pronounce")}</div>
         ${status}
       </div>
       <div class="gloss">${esc(w.gloss || lex.gloss || "")}</div>
@@ -258,6 +297,9 @@
       <div class="card stack small">
         <label class="opt" for="new-per-day">New words per day <input id="new-per-day" type="number" min="1" max="100" value="${S.settings.newPerDay}" data-act="set-new-per-day"></label>
         <label class="opt" for="highlight-new"><input id="highlight-new" type="checkbox" ${S.settings.highlightNew ? "checked" : ""} data-act="toggle-highlight"> Colour words I have not started yet in rose</label>
+        <label class="opt" for="auto-speak"><input id="auto-speak" type="checkbox" ${S.settings.autoSpeak ? "checked" : ""} data-act="toggle-speak"> Say each word aloud when it appears or is tapped</label>
+        <label class="opt" for="speak-rate">Speaking speed <select id="speak-rate" data-act="set-rate"><option value="0.6" ${S.settings.speakRate == 0.6 ? "selected" : ""}>Slow</option><option value="0.75" ${S.settings.speakRate == 0.75 ? "selected" : ""}>Learner</option><option value="0.9" ${S.settings.speakRate == 0.9 ? "selected" : ""}>Natural</option></select></label>
+        <p class="muted">Pronunciation uses the Hebrew voice built into your phone or computer. ${esc(speech.status())}</p>
         <div class="row">
           <button class="btn sm" data-act="export">Export progress</button>
           <button class="btn sm" data-act="import">Import</button>
@@ -279,6 +321,7 @@
         <div class="row" style="justify-content:center"><a class="btn primary" href="#review">Review</a><a class="btn" href="#read">Read</a></div>
         <button class="btn quiet sm" data-act="one-more">Show one more anyway</button></div>`;
     }
+    autoSpeak(next.heb);
     return wordCard(next, left);
   }
   function wordCard(v, left) {
@@ -298,7 +341,7 @@
       <div class="row between small muted"><span>Word #${v.rank} of ${VOCAB.length}</span><span>${left} more today</span></div>
       <div class="card">
         <div class="heb heb-big">${esc(v.heb)}</div>
-        <div class="center translit">${esc(v.translit)}</div>
+        <div class="center translit">${esc(v.translit)} ${speakBtn(v.heb, "Pronounce " + v.translit)}</div>
         <div class="center gloss" style="margin-top:8px">${esc(v.gloss)}</div>
         <div class="center small muted">${esc(typeLabel(v.type))}${v.prefix ? " (inseparable prefix)" : ""} · ${v.count.toLocaleString()}× in the Hebrew Bible</div>
         ${v.kjv ? `<div class="center small" style="margin-top:6px">KJV: ${esc(v.kjv.join(", "))}</div>` : ""}
@@ -335,8 +378,10 @@
     if (c.kind === "word") {
       const v = VOCAB_BY_KEY[c.id] || Object.assign({ key: c.id, heb: "", gloss: "", translit: "", type: "", count: 0 }, LEX[c.id] || {});
       const ex = (INDEX[c.id] || [])[0];
+      if (reviewState.revealed) autoSpeak(v.heb);
       return head + `<div class="card flashcard">
         <div class="heb heb-big">${esc(v.heb)}</div>
+        <div class="center">${speakBtn(v.heb, "Pronounce")}</div>
         ${reviewState.revealed ? `<div class="back">
           <div class="translit">${esc(v.translit)}</div>
           <div class="gloss">${esc(v.gloss)}</div>
@@ -348,7 +393,7 @@
     const v = VERSES[c.id];
     if (!v) { delete S.cards[id]; save(); return renderReview(); }
     return head + `<div class="card">
-      <div class="small muted">${esc(v.ref)} · tap a word for its meaning</div>
+      <div class="row between small muted"><span>${esc(v.ref)} · tap a word for its meaning</span>${speakBtn(v.words.map(w => w.h).join(" "), "Read the verse aloud")}</div>
       ${renderVerse(v)}
       <div id="vpanel"></div>
       ${reviewState.revealed ? kjvBlock(v) : ""}
@@ -398,7 +443,7 @@
     const topicNames = v.topics.map(tid => (TOPICS.find(t => t.id === tid) || {}).title).filter(Boolean);
     return `<a class="btn quiet sm" href="${back}">← Back</a>
       <div class="card">
-        <div class="row between small muted"><span>${esc(v.ref)}${v.aramaic ? " · Aramaic" : ""}</span><span>${newKeys.length === 0 && rare.length === 0 ? '<span class="pill ok">All words known</span>' : `${newKeys.length + rare.length} new word${newKeys.length + rare.length === 1 ? "" : "s"}`}</span></div>
+        <div class="row between small muted"><span>${esc(v.ref)}${v.aramaic ? " · Aramaic" : ""} ${speakBtn(v.words.map(w => w.h).join(" "), "Read the verse aloud")}</span><span>${newKeys.length === 0 && rare.length === 0 ? '<span class="pill ok">All words known</span>' : `${newKeys.length + rare.length} new word${newKeys.length + rare.length === 1 ? "" : "s"}`}</span></div>
         ${renderVerse(v)}
         <div id="vpanel"></div>
         ${versePage.revealed ? kjvBlock(v) : `<button class="btn block" data-act="reveal-verse">Show English</button>`}
@@ -420,7 +465,7 @@
     const ids = (INDEX[key] || []).slice(0, 25);
     sheetBody.innerHTML = `
       <div class="heb heb-big">${esc(lex.heb || (voc && voc.heb) || "")}</div>
-      <div class="center translit">${esc(lex.translit || "")}</div>
+      <div class="center translit">${esc(lex.translit || "")} ${speakBtn(lex.heb || (voc && voc.heb) || "", "Pronounce")}</div>
       <div class="center gloss">${esc(lex.gloss || "")}</div>
       <div class="center small muted">${esc(typeLabel(lex.type))} · ${lex.count || 0}× in the Hebrew Bible${lex.rank ? " · word #" + lex.rank : ""}</div>
       ${voc && voc.kjv ? `<div class="center small">KJV: ${esc(voc.kjv.join(", "))}</div>` : ""}
@@ -443,11 +488,20 @@
       wEl.classList.add("active");
       const panel = container.parentElement.querySelector("#vpanel, #ex-panel") || container.nextElementSibling;
       if (panel) panel.innerHTML = wordPanel(v, i);
+      if (S.settings.autoSpeak) speech.say(v.words[i].h);
       return;
     }
     const el = e.target.closest("[data-act]");
     if (!el) return;
     const act = el.dataset.act;
+    if (act === "speak") {
+      if (!speech.say(el.dataset.say)) {
+        let n = document.getElementById("speech-note");
+        if (!n) { n = document.createElement("div"); n.id = "speech-note"; n.className = "notice"; el.closest(".card, .sheet-card, .wpanel, #view").appendChild(n); }
+        n.textContent = speech.status();
+      }
+      return;
+    }
     if (act === "start-word") { startWord(el.dataset.key, false); route(); }
     else if (act === "know-word") { startWord(el.dataset.key, true); route(); }
     else if (act === "defer-word") { S.deferred[el.dataset.key] = Date.now(); save(); route(); }
@@ -497,6 +551,8 @@
     if (!el) return;
     if (el.dataset.act === "set-new-per-day") { S.settings.newPerDay = Math.max(1, Math.min(100, +el.value || 10)); save(); }
     else if (el.dataset.act === "toggle-highlight") { S.settings.highlightNew = el.checked; save(); route(); }
+    else if (el.dataset.act === "toggle-speak") { S.settings.autoSpeak = el.checked; save(); }
+    else if (el.dataset.act === "set-rate") { S.settings.speakRate = +el.value; save(); speech.say("שָׁלוֹם"); }
   });
   window.addEventListener("hashchange", route);
   route();

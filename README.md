@@ -26,6 +26,12 @@ How it teaches:
    health and stewardship, prayer. The list is in `hebrew/curated.json`; edit it and rebuild.
    Verses can be added to your reviews as whole-verse cards.
 
+**Pronunciation.** Every Hebrew word and verse has a speaker button, and words are read
+aloud as they appear (turn this off on Home). The app uses the Hebrew voice built into
+the device, so nothing is downloaded. iPhones and iPads include one (Carmit); on Android,
+install Hebrew under Text-to-speech in the Google Speech Services settings. The voice
+reads pointed text in modern Israeli pronunciation, the standard used in most seminaries.
+
 Progress is saved in the browser. Export it from Home before changing phones.
 
 ### Rebuilding the data
