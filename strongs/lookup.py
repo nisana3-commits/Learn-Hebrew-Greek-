@@ -16,6 +16,11 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parent / "kjv"))
+try:
+    import kjvtext
+except ImportError:  # kjv/kjv-strongs.txt not built yet
+    kjvtext = None
 FILES = {"H": HERE / "strongs-hebrew.json", "G": HERE / "strongs-greek.json"}
 _cache = {}
 
@@ -40,7 +45,7 @@ def normalize(number, entry):
     }
 
 
-def fmt(e):
+def fmt(e, with_count=True):
     lines = [f"{e['number']}  {e['lemma']}  {e['translit']}"]
     if e["pron"]:
         lines.append(f"Pronounced: {e['pron']}")
@@ -50,6 +55,11 @@ def fmt(e):
         lines.append(f"Definition: {e['definition']}")
     if e["kjv"]:
         lines.append(f"KJV renders it: {e['kjv']}")
+    if with_count and kjvtext is not None and kjvtext.TEXT_FILE.exists():
+        hits = kjvtext.occurrences(e["number"])
+        n = sum(len(h[2]) for h in hits)
+        lines.append(f"Occurs {n} times in {len(hits)} verses. "
+                     f"Verse list: python3 kjv/concordance.py {e['number']}")
     return "\n".join(lines)
 
 
