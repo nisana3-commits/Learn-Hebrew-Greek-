@@ -244,7 +244,7 @@ select { font: inherit; padding: 6px 10px; border: 1.5px solid var(--line); bord
 .eyebrow-label { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; }
 .dots { display: flex; justify-content: center; gap: 7px; margin: 10px 0 16px; }
 .dots i { width: 10px; height: 10px; border-radius: 50%; background: var(--recessed); border: 1px solid var(--line); transition: background 300ms; }
-.dots i.on { background: var(--accent-prefix-new); border-color: transparent; }
+.dots i.on { background: var(--accent); border-color: transparent; }
 .dots i.ok { background: var(--ok); border-color: transparent; }
 .dots i.gold { background: var(--gold-400); border-color: transparent; }
 .ask { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
@@ -264,7 +264,7 @@ input#guess.shake { animation: shake 400ms; }
 .heb-inline.target { background: var(--accent-soft); border-radius: 6px; border-bottom: 0; }
 .list.words li { gap: 10px; }
 .list.words .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--recessed); border: 1px solid var(--line); flex-shrink: 0; }
-.list.words .dot.on { background: var(--accent-prefix-new); border-color: transparent; }
+.list.words .dot.on { background: var(--accent); border-color: transparent; }
 .list.words .dot.ok { background: var(--ok); border-color: transparent; }
 .list.words .dot.gold { background: var(--gold-400); border-color: transparent; }
 .list.words .dot.due { background: var(--accent); border-color: transparent; }

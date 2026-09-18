@@ -67,11 +67,12 @@
   // ---------- state ----------
   const defaults = () => ({ cards: {}, deferred: {}, settings: { newPerDay: 10, highlightNew: true, autoSpeak: true, speakRate: 0.75, classicalW: true }, log: {} });
   let S = load();
+  try { localStorage.setItem(STORE_KEY + ":probe", "1"); localStorage.removeItem(STORE_KEY + ":probe"); } catch (e) { S.storageBroken = true; }
   function load() {
     try { const raw = localStorage.getItem(STORE_KEY); if (raw) return Object.assign(defaults(), JSON.parse(raw)); } catch (e) { /* ignore */ }
     return defaults();
   }
-  function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) { /* ignore */ } }
+  function save() { try { const { storageBroken, ...rest } = S; localStorage.setItem(STORE_KEY, JSON.stringify(rest)); } catch (e) { S.storageBroken = true; } }
   const today = () => new Date().toISOString().slice(0, 10);
   function logToday(field) { const d = today(); S.log[d] = S.log[d] || { new: 0, reviews: 0 }; S.log[d][field] = (S.log[d][field] || 0) + 1; }
 
@@ -452,6 +453,7 @@
           <button class="btn sm quiet" data-act="reset">Reset everything</button>
         </div>
         <div id="io-box" hidden></div>
+        ${S.storageBroken ? `<div class="notice">This browser is not saving progress, so it will be lost when the page closes. Try opening the link in Safari or Chrome directly rather than inside another app.</div>` : ""}
         <p class="muted">Progress is stored in this browser only. Export a copy before switching phones or clearing site data.</p>
       </div>
       <div class="section-title">Sources</div>
@@ -463,7 +465,7 @@
   function nextStudyItem() {
     const fromPool = pool => {
       if (!pool.length) return null;
-      const c = pool.find(x => x.kind + ":" + x.id !== study.last) || pool[0];
+      const c = pool.find(x => x.id !== study.lastId) || pool[0];
       return { id: c.kind + ":" + c.id, kind: c.kind, key: c.kind === "word" ? c.id : null, verse: c.kind === "verse" ? c.id : null, isNew: false };
     };
     const due = fromPool(dueCards());
@@ -472,7 +474,8 @@
       const nw = nextNewWord();
       if (nw) return { id: "new:" + nw.v.key, kind: "word", key: nw.v.key, isNew: true, goal: nw.goal };
     }
-    return fromPool(dueCards(20 * MIN).filter(c => c.state === "learn"));
+    const ahead = dueCards(20 * MIN).filter(c => c.state === "learn" && (study.ahead || c.id !== study.lastId));
+    return fromPool(ahead);
   }
   function seededPick(arr, n, seed) {
     let s = seed * 9301 + 49297;
@@ -612,14 +615,17 @@
     const next = all.length ? Math.min(...all.map(x => x.due)) - Date.now() : null;
     const st = stats();
     const noNew = newLeftToday() === 0 && !!nextNewWord();
+    const soon = all.filter(c => c.state === "learn" && c.due <= Date.now() + 20 * MIN).length;
     return `<div class="card center stack">
       <div class="heb heb-big">שָׁלוֹם</div>
-      <h2>All caught up</h2>
-      <p class="muted">${all.length ? "Next review in " + fmtDelta(Math.max(next, MIN)) + "." : "Your first words will appear here."}${noNew ? " You have started today's " + S.settings.newPerDay + " new words." : ""}</p>
+      <h2>${soon ? "Done for now" : "All caught up"}</h2>
+      <p class="muted">${all.length ? "Next review in " + fmtDelta(Math.max(next, MIN)) + "." : "Your first words will appear here."}${noNew ? " You have started " + ((S.log[today()] || {}).new || 0) + " new word" + (((S.log[today()] || {}).new || 0) === 1 ? "" : "s") + " today, which is today's limit of " + S.settings.newPerDay + "." : ""}${soon ? " " + soon + " word" + (soon === 1 ? " is" : "s are") + " still fresh; give " + (soon === 1 ? "it" : "them") + " a few minutes and come back." : ""}</p>
+      ${S.storageBroken ? `<div class="notice">This browser is not saving progress, so it will be lost when the page closes. Try opening the link in Safari or Chrome directly rather than inside another app.</div>` : ""}
       <div class="stats"><div class="stat"><b>${st.mastered}</b><span>Mastered</span></div><div class="stat"><b>${st.words - st.mastered}</b><span>In progress</span></div><div class="stat"><b>${st.readable}</b><span>Verses ready</span></div></div>
       <div class="row" style="justify-content:center">
         <a class="btn" href="#read">Read</a>
-        ${noNew ? `<button class="btn quiet sm" data-act="one-more">Study one more new word</button>` : ""}
+        ${noNew ? `<button class="btn sm" data-act="one-more">Study one more new word</button>` : ""}
+        ${soon ? `<button class="btn quiet sm" data-act="study-ahead">Review the fresh ${soon === 1 ? "word" : "words"} now</button>` : ""}
       </div>
     </div>`;
   }
@@ -769,12 +775,13 @@
         if (study.goal) { logToday("goal"); study.goalJustDone = goalKeys(VERSES[study.goal]).every(k => k === study.key || isKnown(k)) ? study.goal : null; }
         S.cards[wordCardId(study.key)] = c; delete S.deferred[study.key]; save();
       } else grade(study.id, g);
-      study.last = study.id;
+      study.last = study.id; study.lastId = study.key || study.verse;
       if (study.key) { study.phase = "verses"; study.shuffle = 1; } else study.phase = "ask";
       route();
     }
     else if (act === "shuffle-verses") { study.shuffle++; route(); }
-    else if (act === "continue") { study.phase = "ask"; study.id = null; study.goalJustDone = null; route(); }
+    else if (act === "continue") { study.phase = "ask"; study.id = null; study.goalJustDone = null; study.ahead = false; route(); }
+    else if (act === "study-ahead") { study.ahead = true; study.id = null; route(); }
     else if (act === "open-verse") { sheet.hidden = true; location.hash = "#verse/" + el.dataset.id; }
     else if (act === "open-topic") { location.hash = "#topic/" + el.dataset.id; }
     else if (act === "reveal-verse") { versePage.revealed = true; route(); }
