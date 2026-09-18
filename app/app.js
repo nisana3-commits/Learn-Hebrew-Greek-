@@ -184,6 +184,7 @@
     for (const v of VOCAB) {
       if (isKnown(v.key)) continue;
       if (v.prefix && !prefixReady(v.key.slice(4))) continue;
+      if (!v.prefix && FUNCTION_TYPE.test(v.type || "") && !functionReady()) continue;
       if (S.deferred[v.key]) { later.push(v); continue; }
       out.push(v);
       if (out.length >= n) break;
@@ -211,8 +212,15 @@
     S.cards[verseCardId(id)] = c;
     save();
   }
-  // prefix cards started before the gate existed wait, like new ones, until the prefix can be shown on known words
-  const held = c => c.kind === "word" && c.id.startsWith("pfx:") && !prefixReady(c.id.slice(4));
+  // grammar words with no meaning of their own (the object marker, prepositions, conjunctions, relative,
+  // negative and question words) wait until 100 content words are started
+  const FUNCTION_TYPE = /^[HA]:(Part|Conj|Prep|RelP|Neg|Cond|Cor|Intg|Art|ImpP)\b/;
+  const isFunctionWord = key => { const v = VOCAB_BY_KEY[key]; return !!v && !v.prefix && FUNCTION_TYPE.test(v.type || ""); };
+  const CONTENT_GATE = 100;
+  const contentStarted = () => Object.values(S.cards).filter(c => c.kind === "word" && !c.id.startsWith("pfx:") && !isFunctionWord(c.id)).length;
+  const functionReady = () => contentStarted() >= CONTENT_GATE;
+  // cards started before a gate existed wait like new ones
+  const held = c => c.kind === "word" && ((c.id.startsWith("pfx:") && !prefixReady(c.id.slice(4))) || (isFunctionWord(c.id) && !functionReady()));
   function dueCards(aheadMs) {
     const now = Date.now() + (aheadMs || 0);
     return Object.values(S.cards).filter(c => c.due <= now && !held(c))
@@ -370,7 +378,7 @@
       </div>
       <div class="card stack" style="margin-top:14px">
         <div class="progress"><i style="width:${pct}%"></i><b>${st.words} of ${VOCAB.length} words started</b></div>
-        <p class="small muted">Each study card asks you for the meaning first, then shows the word inside real verses. Words you have answered right twice start appearing in Hebrew inside every English verse, so Scripture turns into Hebrew as you go. The little prefixes (and, the, in, to, from) come once you know words they attach to.</p>
+        <p class="small muted">Each study card asks you for the meaning first, then shows the word inside real verses. Words you have answered right twice start appearing in Hebrew inside every English verse, so Scripture turns into Hebrew as you go. Grammar words with no meaning of their own, such as the object marker and prepositions, wait until 100 words are started; the little prefixes (and, the, in, to, from) come once you know words they attach to.</p>
         <div class="row">
           <a class="btn primary" href="#study">Study${st.due ? " (" + st.due + " due)" : left ? " (" + left + " new)" : ""}</a>
           <a class="btn" href="#read">Read</a>
@@ -590,7 +598,7 @@
     const status = key => {
       const c = S.cards[wordCardId(key)];
       if (!c) return ["", "not started"];
-      if (held(c)) return ["", "waiting for known words"];
+      if (held(c)) return ["", c.id.startsWith("pfx:") ? "waiting for known words" : "grammar word, waits until 100 words"];
       if (isMastered(c)) return ["gold", "mastered"];
       if (c.due <= Date.now()) return ["due", "due now"];
       if (c.state === "review") return ["ok", "reviewing"];

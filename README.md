@@ -14,7 +14,9 @@ How it teaches:
    Together they cover 97 percent of every word in the Hebrew Bible. The eight inseparable
    prefixes (and, the, in, to, from, like, the question marker, who) are held back until
    you have started ten words and two of them appear with that prefix; the prefix card
-   then shows it riding on words you already know.
+   then shows it riding on words you already know. Grammar words with no meaning of their
+   own (the object marker, prepositions, conjunctions, relative, negative and question
+   words) wait until 100 content words are started.
 2. **Recall first.** Each study card shows the Hebrew word and asks you to type its
    meaning before the answer appears. You judge yourself: Missed or Got it. Five dots
    track your streak on that word.
