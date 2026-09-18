@@ -10,13 +10,20 @@ and it is laid out for a phone.
 
 How it teaches:
 
-1. **Words in frequency order.** The 3,507 Hebrew words that occur five or more times.
-   Together they cover 97 percent of every word in the Hebrew Bible. The eight inseparable
+1. **Sentences first, then frequency.** Sixty short goal verses sit in learning order in
+   `hebrew/curated.json` (Genesis 1:3, the Shema, the priestly blessing, three
+   commandments, Genesis 1:1, Psalm 23:1, Exodus 20:8, and on). About seven of every ten
+   new words come from the next goal sentence, so whole verses become readable from the
+   first days: at ten words a day, Genesis 1:3 and Deuteronomy 6:4 on day two, the
+   priestly blessing by day three, roughly 27 sentences in two weeks. The remaining new
+   words follow frequency order through the 3,507 words that occur five or more times,
+   which together cover 97 percent of the Hebrew Bible. The eight inseparable
    prefixes (and, the, in, to, from, like, the question marker, who) are held back until
    you have started ten words and two of them appear with that prefix; the prefix card
    then shows it riding on words you already know. Grammar words with no meaning of their
    own (the object marker, prepositions, conjunctions, relative, negative and question
-   words) wait until 100 content words are started.
+   words) wait until 100 content words are started. A goal sentence that needs a prefix
+   or a grammar word teaches it in that sentence, gate or not.
 2. **Recall first.** Each study card shows the Hebrew word and asks you to type its
    meaning before the answer appears. You judge yourself: Missed or Got it. Five dots
    track your streak on that word.

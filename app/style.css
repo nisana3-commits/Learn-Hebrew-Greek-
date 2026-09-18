@@ -274,3 +274,5 @@ input#guess.shake { animation: shake 400ms; }
 .verse-en .pill { text-decoration: none; font-size: 11px; }
 .pfx-ex { display: flex; flex-direction: column; gap: 6px; text-align: left; margin-top: 4px; }
 .pfx-ex .heb-inline { border-bottom: 0; }
+.goal-line { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin: 8px 0 10px; }
+.card.done { border-color: var(--ok); }

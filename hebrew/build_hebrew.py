@@ -471,6 +471,23 @@ def main(wlc_dir, tbesh_path):
     if missing:
         print("WARNING: no Hebrew verse found for", missing)
 
+    # goal sentences: pulled forward by the app so whole verses become readable early
+    goals = []
+    for ref in curated.get("goals", []):
+        for k in expand_ref(ref, kjv):
+            wl = kjv_to_wlc.get(k, [])
+            if not wl:
+                missing.append(k)
+                continue
+            osis = wl[-1]  # the verse proper, not a psalm title
+            if osis not in out_verses:
+                out_verses[osis] = build_verse(osis)
+            out_verses[osis]["star"] = True
+            if osis not in goals:
+                goals.append(osis)
+            if out_verses[osis]["unknown"]:
+                print("NOTE: goal verse", ref, "has", out_verses[osis]["unknown"], "word(s) outside the vocabulary list")
+
     # reading ladder: short verses fully covered by the vocabulary, spread across levels
     ladder = []
     candidates = []
@@ -522,7 +539,7 @@ def main(wlc_dir, tbesh_path):
     OUT.mkdir(parents=True, exist_ok=True)
     json.dump({"vocab": vocab, "totalWords": sum(freq.values())},
               open(OUT / "vocab.json", "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
-    json.dump({"topics": topics, "ladder": ladder, "verses": out_verses},
+    json.dump({"topics": topics, "ladder": ladder, "goals": goals, "verses": out_verses},
               open(OUT / "verses.json", "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
     json.dump(lexicon, open(OUT / "lexicon.json", "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
 

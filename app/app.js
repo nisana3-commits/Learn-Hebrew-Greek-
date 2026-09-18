@@ -8,6 +8,7 @@
   const VERSES = window.HEB_VERSES.verses;
   const TOPICS = window.HEB_VERSES.topics;
   const LADDER = window.HEB_VERSES.ladder;
+  const GOALS = window.HEB_VERSES.goals || [];
   const LEX = window.HEB_LEXICON;
   const VOCAB_BY_KEY = Object.fromEntries(VOCAB.map(v => [v.key, v]));
 
@@ -72,7 +73,7 @@
   }
   function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) { /* ignore */ } }
   const today = () => new Date().toISOString().slice(0, 10);
-  function logToday(field) { const d = today(); S.log[d] = S.log[d] || { new: 0, reviews: 0 }; S.log[d][field]++; }
+  function logToday(field) { const d = today(); S.log[d] = S.log[d] || { new: 0, reviews: 0 }; S.log[d][field] = (S.log[d][field] || 0) + 1; }
 
   // ---------- scheduler (SM-2 with learning steps) ----------
   function newCard(kind, id) {
@@ -220,7 +221,9 @@
   const contentStarted = () => Object.values(S.cards).filter(c => c.kind === "word" && !c.id.startsWith("pfx:") && !isFunctionWord(c.id)).length;
   const functionReady = () => contentStarted() >= CONTENT_GATE;
   // cards started before a gate existed wait like new ones
-  const held = c => c.kind === "word" && ((c.id.startsWith("pfx:") && !prefixReady(c.id.slice(4))) || (isFunctionWord(c.id) && !functionReady()));
+  // words taught inside a goal sentence already reached are never held back
+  const reachedGoalKeys = () => { const s = new Set(); for (const id of GOALS) { for (const k of goalKeys(VERSES[id])) s.add(k); if (!goalDone(id)) break; } return s; };
+  const held = c => c.kind === "word" && !reachedGoalKeys().has(c.id) && ((c.id.startsWith("pfx:") && !prefixReady(c.id.slice(4))) || (isFunctionWord(c.id) && !functionReady()));
   function dueCards(aheadMs) {
     const now = Date.now() + (aheadMs || 0);
     return Object.values(S.cards).filter(c => c.due <= now && !held(c))
@@ -267,6 +270,29 @@
       }
     }
     return out;
+  }
+
+  // goal sentences: the words of the next unread one are pulled forward
+  const goalKeys = v => { const s = new Set(); for (const w of v.words) { for (const p of w.pfx) s.add("pfx:" + p); if (w.key && VOCAB_BY_KEY[w.key]) s.add(w.key); } return [...s]; };
+  const goalDone = id => goalKeys(VERSES[id]).every(isKnown);
+  const currentGoal = () => GOALS.find(id => !goalDone(id)) || null;
+  const goalShare = () => Math.ceil((S.settings.newPerDay || 10) * 0.7);
+  function nextGoalWord() {
+    const g = currentGoal();
+    if (!g) return null;
+    const keys = goalKeys(VERSES[g]).filter(k => !isKnown(k));
+    // content words first, then grammar words and prefixes, each by frequency
+    keys.sort((a, b) => (VOCAB_BY_KEY[a].prefix || isFunctionWord(a)) - (VOCAB_BY_KEY[b].prefix || isFunctionWord(b)) || VOCAB_BY_KEY[a].rank - VOCAB_BY_KEY[b].rank);
+    return keys.length ? { v: VOCAB_BY_KEY[keys[0]], goal: g } : null;
+  }
+  // the next word to start: goal words take about seven of every ten, frequency order fills the rest
+  function nextNewWord() {
+    const usedGoal = (S.log[today()] || {}).goal || 0;
+    const g = nextGoalWord();
+    if (g && usedGoal < goalShare()) return g;
+    const v = nextNewWords(1)[0];
+    if (v) return { v, goal: null };
+    return g;
   }
 
   // verses that contain a key, easiest first
@@ -378,13 +404,14 @@
       </div>
       <div class="card stack" style="margin-top:14px">
         <div class="progress"><i style="width:${pct}%"></i><b>${st.words} of ${VOCAB.length} words started</b></div>
-        <p class="small muted">Each study card asks you for the meaning first, then shows the word inside real verses. Words you have answered right twice start appearing in Hebrew inside every English verse, so Scripture turns into Hebrew as you go. Grammar words with no meaning of their own, such as the object marker and prepositions, wait until 100 words are started; the little prefixes (and, the, in, to, from) come once you know words they attach to.</p>
+        <p class="small muted">Each study card asks you for the meaning first, then shows the word inside real verses. Words you have answered right twice start appearing in Hebrew inside every English verse, so Scripture turns into Hebrew as you go. Most new words come from the next goal sentence, so you read whole verses from the first days. Grammar words with no meaning of their own wait until 100 words are started, and the little prefixes (and, the, in, to, from) come once you know words they attach to, unless a goal sentence needs them.</p>
         <div class="row">
           <a class="btn primary" href="#study">Study${st.due ? " (" + st.due + " due)" : left ? " (" + left + " new)" : ""}</a>
           <a class="btn" href="#read">Read</a>
           <a class="btn" href="#words">All words</a>
         </div>
       </div>
+      ${(() => { const g = currentGoal(); const readable = GOALS.filter(goalDone).length; if (!g) return `<div class="section-title">Sentences</div><div class="card small">You can read all ${GOALS.length} goal sentences. Words now come in frequency order.</div>`; const gv = VERSES[g]; const ks = goalKeys(gv); const known = ks.filter(isKnown).length; return `<div class="section-title">Next sentence</div><div class="card stack"><div class="row between"><h3>${esc(gv.ref)}</h3><span class="pill${known === ks.length ? " ok" : ""}">${known} of ${ks.length} words</span></div><div class="progress"><i style="width:${Math.round(100 * known / ks.length)}%"></i><b>${readable} sentence${readable === 1 ? "" : "s"} readable so far</b></div><div class="small muted">${esc(gv.kjv)}</div><div class="row"><a class="btn sm" href="#verse/${g}">Look at it</a><a class="btn sm quiet" href="#read">All ${GOALS.length} sentences</a></div></div>`; })()}
       <div class="section-title">Today</div>
       <div class="card small">
         ${(S.log[today()] || { new: 0, reviews: 0 }).new} new words, ${(S.log[today()] || { new: 0, reviews: 0 }).reviews} answers. ${st.words} words started, ${st.mastered} mastered (three right in a row). ${st.verses} verses in your reviews.
@@ -442,8 +469,8 @@
     const due = fromPool(dueCards());
     if (due) return due;
     if (newLeftToday() > 0) {
-      const v = nextNewWords(1)[0];
-      if (v) return { id: "new:" + v.key, kind: "word", key: v.key, isNew: true };
+      const nw = nextNewWord();
+      if (nw) return { id: "new:" + nw.v.key, kind: "word", key: nw.v.key, isNew: true, goal: nw.goal };
     }
     return fromPool(dueCards(20 * MIN).filter(c => c.state === "learn"));
   }
@@ -486,10 +513,11 @@
     if (study.phase === "verses" && study.key) return renderVersesPhase();
     const item = nextStudyItem();
     if (!item) return renderCaughtUp();
-    if (study.id !== item.id) study = { id: item.id, phase: "ask", guess: "", shuffle: 1, isNew: item.isNew, key: item.key, verse: item.verse, last: study.last };
+    if (study.id !== item.id) study = { id: item.id, phase: "ask", guess: "", shuffle: 1, isNew: item.isNew, key: item.key, verse: item.verse, goal: item.goal || null, last: study.last };
     const due = dueCards().length;
     const left = newLeftToday();
-    const head = (label) => `<div class="row between small muted"><span>${due} due${study.isNew ? " · new word" : " · " + label}</span><span>${left} new left today</span></div>`;
+    const goalLine = study.goal ? (() => { const gv = VERSES[study.goal]; const ks = goalKeys(gv); const known = ks.filter(isKnown).length; return `<div class="goal-line"><span class="pill">Toward ${esc(gv.ref)}</span><span class="small muted">${known} of ${ks.length} words · ${esc(gv.kjv.replace(/^[^.]*\. (?=[A-Z])/, "").slice(0, 70))}${gv.kjv.length > 70 ? "…" : ""}</span></div>`; })() : "";
+    const head = (label) => `<div class="row between small muted"><span>${due} due${study.isNew ? " · new word" : " · " + label}</span><span>${left} new left today</span></div>` + goalLine;
     if (item.kind === "verse") {
       const v = VERSES[item.verse];
       if (!v) { delete S.cards[item.id]; save(); return renderStudy(); }
@@ -547,6 +575,7 @@
       pools = [keyVerses.filter(onKnown), topical.filter(onKnown), rest.filter(onKnown), keyVerses, topical, rest];
     }
     const pick = [];
+    if (study.goal && VERSES[study.goal].seg.some(([, wi]) => wi != null && wordHas(VERSES[study.goal].words[wi], key))) pick.push(study.goal);
     for (const pool of pools) {
       if (pick.length >= 5) break;
       pick.push(...seededPick(pool.filter(id => !pick.includes(id)), 5 - pick.length, study.shuffle));
@@ -564,7 +593,9 @@
         <div class="vpanel-slot"></div>
       </div>`;
     }).join("");
-    return `<div class="center" style="margin-bottom:12px">
+    const done = study.goalJustDone ? VERSES[study.goalJustDone] : null;
+    const doneHtml = done ? `<div class="card done"><div class="small muted eyebrow-label">You can now read</div><div class="row between"><h3>${esc(done.ref)}</h3><a class="btn sm primary" href="#verse/${done.id}">Read it</a></div>${renderVerse(done)}</div>` : "";
+    return doneHtml + `<div class="center" style="margin-bottom:12px">
         <div class="heb heb-big">${esc(v.heb)}</div>
         <div class="gloss center">${esc(v.gloss)}</div>
         <div class="small muted">${keyVerses.length || topical.length ? "This word in the Bible truths you are studying." : "This word in Scripture."} Tap a Hebrew word to hear it.</div>
@@ -580,7 +611,7 @@
     const all = Object.values(S.cards).filter(c => !held(c));
     const next = all.length ? Math.min(...all.map(x => x.due)) - Date.now() : null;
     const st = stats();
-    const noNew = newLeftToday() === 0 && nextNewWords(1).length > 0;
+    const noNew = newLeftToday() === 0 && !!nextNewWord();
     return `<div class="card center stack">
       <div class="heb heb-big">שָׁלוֹם</div>
       <h2>All caught up</h2>
@@ -623,7 +654,11 @@
       (n === 0 ? ready : n === 1 ? one : n === 2 ? two : more).push(id);
     }
     const group = (title, ids, limit) => ids.length ? `<div class="section-title">${title} (${ids.length})</div><ul class="list">${ids.slice(0, limit).map(verseRow).join("")}</ul>${ids.length > limit ? `<p class="small muted">Showing ${limit}. Learn more words and the list moves.</p>` : ""}` : "";
+    const goalRows = GOALS.map(id => { const v = VERSES[id]; const ks = goalKeys(v); const known = ks.filter(isKnown).length; const ready = known === ks.length && rareKeysInVerse(v).length === 0; return `<li data-act="open-verse" data-id="${id}"><span class="ref">${esc(v.ref)}</span><span class="heb">${esc(v.words.map(w => w.h).join(" "))}</span>${ready ? '<span class="pill ok">Ready</span>' : `<span class="pill gray">${known}/${ks.length}</span>`}</li>`; });
     return `
+      <div class="section-title">Sentences, in learning order (${GOALS.filter(goalDone).length} of ${GOALS.length} readable)</div>
+      <p class="small muted">Short verses whose words come first in Study, so you read whole sentences early.</p>
+      <ul class="list">${goalRows.join("")}</ul>
       <div class="section-title">Bible truths, verse by verse</div>
       ${TOPICS.map(t => {
         const r = t.verses.filter(id => newKeysInVerse(VERSES[id]).length === 0 && rareKeysInVerse(VERSES[id]).length === 0).length;
@@ -731,6 +766,7 @@
       const g = +el.dataset.g;
       if (study.isNew) {
         const c = newCard("word", study.key); apply(c, g, Date.now()); c.streak = g === 0 ? 0 : 1; logToday("new");
+        if (study.goal) { logToday("goal"); study.goalJustDone = goalKeys(VERSES[study.goal]).every(k => k === study.key || isKnown(k)) ? study.goal : null; }
         S.cards[wordCardId(study.key)] = c; delete S.deferred[study.key]; save();
       } else grade(study.id, g);
       study.last = study.id;
@@ -738,7 +774,7 @@
       route();
     }
     else if (act === "shuffle-verses") { study.shuffle++; route(); }
-    else if (act === "continue") { study.phase = "ask"; study.id = null; route(); }
+    else if (act === "continue") { study.phase = "ask"; study.id = null; study.goalJustDone = null; route(); }
     else if (act === "open-verse") { sheet.hidden = true; location.hash = "#verse/" + el.dataset.id; }
     else if (act === "open-topic") { location.hash = "#topic/" + el.dataset.id; }
     else if (act === "reveal-verse") { versePage.revealed = true; route(); }
