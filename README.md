@@ -26,6 +26,10 @@ How it teaches:
    health and stewardship, prayer. The list is in `hebrew/curated.json`; edit it and rebuild.
    Verses can be added to your reviews as whole-verse cards.
 
+**Transliteration.** Shown in the classical reading by default, with vav as w (YHWH,
+not YHVH). A setting on Home switches to modern Israeli, with vav as v. Only the letter
+vav changes; bet without a dagesh keeps its v in both.
+
 **Pronunciation.** Every Hebrew word and verse has a speaker button, and words are read
 aloud as they appear (turn this off on Home). The app uses the Hebrew voice built into
 the device, so nothing is downloaded. iPhones and iPads include one (Carmit); on Android,

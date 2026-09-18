@@ -15,7 +15,7 @@
   const STORE_KEY = "hebrew-srs-v1";
 
   // ---------- state ----------
-  const defaults = () => ({ cards: {}, deferred: {}, settings: { newPerDay: 10, highlightNew: true, autoSpeak: true, speakRate: 0.75 }, log: {} });
+  const defaults = () => ({ cards: {}, deferred: {}, settings: { newPerDay: 10, highlightNew: true, autoSpeak: true, speakRate: 0.75, classicalW: true }, log: {} });
   let S = load();
   function load() {
     try { const raw = localStorage.getItem(STORE_KEY); if (raw) return Object.assign(defaults(), JSON.parse(raw)); } catch (e) { /* ignore */ }
@@ -186,6 +186,8 @@
   for (const k in INDEX) INDEX[k] = [...INDEX[k]].sort((a, b) => VERSES[a].aramaic - VERSES[b].aramaic || VERSES[a].level - VERSES[b].level || VERSES[a].words.length - VERSES[b].words.length);
 
   // ---------- rendering helpers ----------
+  // transliteration: classical (vav as w) or modern Israeli (vav as v)
+  const tr = o => (o && (S.settings.classicalW && o.translitW ? o.translitW : o.translit)) || "";
   const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   function typeLabel(t) {
     if (!t) return "";
@@ -226,7 +228,7 @@
     }
     return `<div class="wpanel">
       <div class="row between">
-        <div><span class="heb">${esc(w.h)}</span> <span class="translit">${esc(w.translit || lex.translit || "")}</span> ${speakBtn(w.h, "Pronounce")}</div>
+        <div><span class="heb">${esc(w.h)}</span> <span class="translit">${esc(tr(w) || tr(lex))}</span> ${speakBtn(w.h, "Pronounce")}</div>
         ${status}
       </div>
       <div class="gloss">${esc(w.gloss || lex.gloss || "")}</div>
@@ -297,9 +299,10 @@
       <div class="card stack small">
         <label class="opt" for="new-per-day">New words per day <input id="new-per-day" type="number" min="1" max="100" value="${S.settings.newPerDay}" data-act="set-new-per-day"></label>
         <label class="opt" for="highlight-new"><input id="highlight-new" type="checkbox" ${S.settings.highlightNew ? "checked" : ""} data-act="toggle-highlight"> Colour words I have not started yet in rose</label>
+        <label class="opt" for="classical-w"><input id="classical-w" type="checkbox" ${S.settings.classicalW ? "checked" : ""} data-act="toggle-w"> Transliterate vav as w, the classical reading (off: modern Israeli v)</label>
         <label class="opt" for="auto-speak"><input id="auto-speak" type="checkbox" ${S.settings.autoSpeak ? "checked" : ""} data-act="toggle-speak"> Say each word aloud when it appears or is tapped</label>
         <label class="opt" for="speak-rate">Speaking speed <select id="speak-rate" data-act="set-rate"><option value="0.6" ${S.settings.speakRate == 0.6 ? "selected" : ""}>Slow</option><option value="0.75" ${S.settings.speakRate == 0.75 ? "selected" : ""}>Learner</option><option value="0.9" ${S.settings.speakRate == 0.9 ? "selected" : ""}>Natural</option></select></label>
-        <p class="muted">Pronunciation uses the Hebrew voice built into your phone or computer. ${esc(speech.status())}</p>
+        <p class="muted">Pronunciation uses the Hebrew voice built into your phone or computer, which speaks modern Israeli Hebrew (vav as v). ${esc(speech.status())}</p>
         <div class="row">
           <button class="btn sm" data-act="export">Export progress</button>
           <button class="btn sm" data-act="import">Import</button>
@@ -341,7 +344,7 @@
       <div class="row between small muted"><span>Word #${v.rank} of ${VOCAB.length}</span><span>${left} more today</span></div>
       <div class="card">
         <div class="heb heb-big">${esc(v.heb)}</div>
-        <div class="center translit">${esc(v.translit)} ${speakBtn(v.heb, "Pronounce " + v.translit)}</div>
+        <div class="center translit">${esc(tr(v))} ${speakBtn(v.heb, "Pronounce " + tr(v))}</div>
         <div class="center gloss" style="margin-top:8px">${esc(v.gloss)}</div>
         <div class="center small muted">${esc(typeLabel(v.type))}${v.prefix ? " (inseparable prefix)" : ""} · ${v.count.toLocaleString()}× in the Hebrew Bible</div>
         ${v.kjv ? `<div class="center small" style="margin-top:6px">KJV: ${esc(v.kjv.join(", "))}</div>` : ""}
@@ -383,7 +386,7 @@
         <div class="heb heb-big">${esc(v.heb)}</div>
         <div class="center">${speakBtn(v.heb, "Pronounce")}</div>
         ${reviewState.revealed ? `<div class="back">
-          <div class="translit">${esc(v.translit)}</div>
+          <div class="translit">${esc(tr(v))}</div>
           <div class="gloss">${esc(v.gloss)}</div>
           <div class="small muted">${esc(typeLabel(v.type))}${v.kjv ? " · KJV: " + esc(v.kjv.slice(0, 3).join(", ")) : ""}</div>
           ${ex ? `<div class="example"><div class="heb heb-small hide-new" style="text-align:center">${esc(VERSES[ex].words.map(w => w.h).join(" "))}</div><div class="small muted">${esc(VERSES[ex].ref)}: ${esc(VERSES[ex].kjv)}</div></div>` : ""}
@@ -465,7 +468,7 @@
     const ids = (INDEX[key] || []).slice(0, 25);
     sheetBody.innerHTML = `
       <div class="heb heb-big">${esc(lex.heb || (voc && voc.heb) || "")}</div>
-      <div class="center translit">${esc(lex.translit || "")} ${speakBtn(lex.heb || (voc && voc.heb) || "", "Pronounce")}</div>
+      <div class="center translit">${esc(tr(lex))} ${speakBtn(lex.heb || (voc && voc.heb) || "", "Pronounce")}</div>
       <div class="center gloss">${esc(lex.gloss || "")}</div>
       <div class="center small muted">${esc(typeLabel(lex.type))} · ${lex.count || 0}× in the Hebrew Bible${lex.rank ? " · word #" + lex.rank : ""}</div>
       ${voc && voc.kjv ? `<div class="center small">KJV: ${esc(voc.kjv.join(", "))}</div>` : ""}
@@ -552,6 +555,7 @@
     if (el.dataset.act === "set-new-per-day") { S.settings.newPerDay = Math.max(1, Math.min(100, +el.value || 10)); save(); }
     else if (el.dataset.act === "toggle-highlight") { S.settings.highlightNew = el.checked; save(); route(); }
     else if (el.dataset.act === "toggle-speak") { S.settings.autoSpeak = el.checked; save(); }
+    else if (el.dataset.act === "toggle-w") { S.settings.classicalW = el.checked; save(); route(); }
     else if (el.dataset.act === "set-rate") { S.settings.speakRate = +el.value; save(); speech.say("שָׁלוֹם"); }
   });
   window.addEventListener("hashchange", route);
