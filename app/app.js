@@ -183,6 +183,7 @@
     const later = [];
     for (const v of VOCAB) {
       if (isKnown(v.key)) continue;
+      if (v.prefix && !prefixReady(v.key.slice(4))) continue;
       if (S.deferred[v.key]) { later.push(v); continue; }
       out.push(v);
       if (out.length >= n) break;
@@ -231,6 +232,31 @@
       readable: LADDER.concat(TOPICS.flatMap(t => t.verses)).filter((id, i, a) => a.indexOf(id) === i)
         .filter(id => newKeysInVerse(VERSES[id]).length === 0 && rareKeysInVerse(VERSES[id]).length === 0).length,
     };
+  }
+
+  // which lemmas each prefix rides on, from the verses in the app
+  const PFX_LEMMAS = {};
+  for (const id in VERSES) for (const w of VERSES[id].words) if (w.key) for (const p of w.pfx) (PFX_LEMMAS[p] = PFX_LEMMAS[p] || new Set()).add(w.key);
+  // a prefix card is offered only after ten content words are started and two of them carry that prefix
+  function prefixReady(p) {
+    const started = Object.values(S.cards).filter(c => c.kind === "word" && !c.id.startsWith("pfx:")).length;
+    if (started < 10) return false;
+    let n = 0;
+    for (const k of PFX_LEMMAS[p] || []) if (isKnown(k) && ++n >= 2) return true;
+    return false;
+  }
+  // forms of a prefix on words the learner knows, for the prefix card
+  function prefixExamples(p, limit) {
+    const out = [], seen = new Set();
+    for (const id in VERSES) {
+      for (const w of VERSES[id].words) {
+        if (w.pfx.length === 1 && w.pfx[0] === p && w.key && isKnown(w.key) && !seen.has(w.h)) {
+          seen.add(w.h); out.push(w);
+          if (out.length >= limit) return out;
+        }
+      }
+    }
+    return out;
   }
 
   // verses that contain a key, easiest first
@@ -342,7 +368,7 @@
       </div>
       <div class="card stack" style="margin-top:14px">
         <div class="progress"><i style="width:${pct}%"></i><b>${st.words} of ${VOCAB.length} words started</b></div>
-        <p class="small muted">Each study card asks you for the meaning first, then shows the word inside real verses. Words you have answered right twice start appearing in Hebrew inside every English verse, so Scripture turns into Hebrew as you go.</p>
+        <p class="small muted">Each study card asks you for the meaning first, then shows the word inside real verses. Words you have answered right twice start appearing in Hebrew inside every English verse, so Scripture turns into Hebrew as you go. The little prefixes (and, the, in, to, from) come once you know words they attach to.</p>
         <div class="row">
           <a class="btn primary" href="#study">Study${st.due ? " (" + st.due + " due)" : left ? " (" + left + " new)" : ""}</a>
           <a class="btn" href="#read">Read</a>
@@ -476,9 +502,13 @@
         </div>
         <button class="btn quiet sm" data-act="reveal">Show answer</button>
       </div>`;
+    const ex = v.prefix ? prefixExamples(item.key.slice(4), 4) : [];
+    const exHtml = ex.length ? `<div class="pfx-ex"><div class="small muted">On words you know</div>${ex.map(w => `<div class="row between"><span class="heb heb-inline">${w.parts.map((pt, j) => `<span class="${j < w.pfx.length ? "p" : "m"}">${esc(pt)}</span>`).join("")}</span><span class="small">${esc(tr(w))} · ${esc(w.eng || w.gloss)}</span></div>`).join("")}</div>` : "";
     const reveal = `<div class="answer">
         <div class="small muted eyebrow-label">Answer</div>
         <div class="gloss">${esc(v.gloss)}</div>
+        ${v.prefix ? `<div class="small muted">A prefix: it is attached to the front of the next word.</div>` : ""}
+        ${exHtml}
         <div class="small muted">${esc(typeLabel(v.type))}${v.kjv ? " · KJV: " + esc(v.kjv.slice(0, 3).join(", ")) : ""} · ${(v.count || 0).toLocaleString()}× in the Hebrew Bible</div>
         ${guessLine}
       </div>` + verdictButtons();
@@ -500,9 +530,17 @@
     const key = study.key;
     const v = VOCAB_BY_KEY[key] || LEX[key] || {};
     const { key: keyVerses, topical, rest } = versesForWord(key);
-    const pick = seededPick(keyVerses, 5, study.shuffle);
-    if (pick.length < 5) pick.push(...seededPick(topical, 5 - pick.length, study.shuffle));
-    if (pick.length < 5) pick.push(...seededPick(rest, 5 - pick.length, study.shuffle));
+    let pools = [keyVerses, topical, rest];
+    if (key.startsWith("pfx:")) {
+      const p = key.slice(4);
+      const onKnown = id => VERSES[id].words.some(w => w.pfx.includes(p) && w.key && isKnown(w.key));
+      pools = [keyVerses.filter(onKnown), topical.filter(onKnown), rest.filter(onKnown), keyVerses, topical, rest];
+    }
+    const pick = [];
+    for (const pool of pools) {
+      if (pick.length >= 5) break;
+      pick.push(...seededPick(pool.filter(id => !pick.includes(id)), 5 - pick.length, study.shuffle));
+    }
     const total = keyVerses.length + topical.length + rest.length;
     let anySwapped = false;
     const list = pick.map(id => {

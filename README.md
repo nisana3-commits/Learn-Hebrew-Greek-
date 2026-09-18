@@ -10,9 +10,11 @@ and it is laid out for a phone.
 
 How it teaches:
 
-1. **Words in frequency order.** The 3,507 Hebrew words that occur five or more times,
-   starting with the eight inseparable prefixes (and, the, in, to, from, like...). Together
-   they cover 97 percent of every word in the Hebrew Bible.
+1. **Words in frequency order.** The 3,507 Hebrew words that occur five or more times.
+   Together they cover 97 percent of every word in the Hebrew Bible. The eight inseparable
+   prefixes (and, the, in, to, from, like, the question marker, who) are held back until
+   you have started ten words and two of them appear with that prefix; the prefix card
+   then shows it riding on words you already know.
 2. **Recall first.** Each study card shows the Hebrew word and asks you to type its
    meaning before the answer appears. You judge yourself: Missed or Got it. Five dots
    track your streak on that word.

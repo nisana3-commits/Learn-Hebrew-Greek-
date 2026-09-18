@@ -272,3 +272,5 @@ input#guess.shake { animation: shake 400ms; }
 .list.words .right { margin-left: auto; white-space: nowrap; }
 .search { width: 100%; font: 16px var(--font-text); padding: 10px 14px; border: 1.5px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--text); margin-bottom: 8px; }
 .verse-en .pill { text-decoration: none; font-size: 11px; }
+.pfx-ex { display: flex; flex-direction: column; gap: 6px; text-align: left; margin-top: 4px; }
+.pfx-ex .heb-inline { border-bottom: 0; }
