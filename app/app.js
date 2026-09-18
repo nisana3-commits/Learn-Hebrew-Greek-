@@ -211,9 +211,11 @@
     S.cards[verseCardId(id)] = c;
     save();
   }
+  // prefix cards started before the gate existed wait, like new ones, until the prefix can be shown on known words
+  const held = c => c.kind === "word" && c.id.startsWith("pfx:") && !prefixReady(c.id.slice(4));
   function dueCards(aheadMs) {
     const now = Date.now() + (aheadMs || 0);
-    return Object.values(S.cards).filter(c => c.due <= now)
+    return Object.values(S.cards).filter(c => c.due <= now && !held(c))
       .sort((a, b) => (a.state === "review") - (b.state === "review") || a.due - b.due);
   }
   const keyBase = k => (k || "").replace(/[a-z]$/, "");
@@ -567,7 +569,7 @@
       </div>`;
   }
   function renderCaughtUp() {
-    const all = Object.values(S.cards);
+    const all = Object.values(S.cards).filter(c => !held(c));
     const next = all.length ? Math.min(...all.map(x => x.due)) - Date.now() : null;
     const st = stats();
     const noNew = newLeftToday() === 0 && nextNewWords(1).length > 0;
@@ -588,6 +590,7 @@
     const status = key => {
       const c = S.cards[wordCardId(key)];
       if (!c) return ["", "not started"];
+      if (held(c)) return ["", "waiting for known words"];
       if (isMastered(c)) return ["gold", "mastered"];
       if (c.due <= Date.now()) return ["due", "due now"];
       if (c.state === "review") return ["ok", "reviewing"];
