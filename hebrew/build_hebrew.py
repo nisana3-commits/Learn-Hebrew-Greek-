@@ -24,6 +24,9 @@ import unicodedata
 from collections import Counter, defaultdict
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from translit import transliterate  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "app" / "data"
 KJV_FILE = ROOT / "kjv" / "kjv-strongs.txt"
@@ -173,52 +176,11 @@ def lemma_key(lemma):
 
 
 
-# ---------- classical transliteration: vav as "w" ----------
-VOWELS = set("\u05B0\u05B1\u05B2\u05B3\u05B4\u05B5\u05B6\u05B7\u05B8\u05B9\u05BA\u05BB")
-HOLAM, DAGESH, SHUREQ_MARK = "\u05B9", "\u05BC", "\u05BC"
-
-
-def v_sources(heb):
-    """For a pointed word, list which letters would be transliterated 'v':
-    'bet' for bet without dagesh, 'vav' for a consonantal vav. Matres are skipped."""
-    letters = []  # (char, marks)
-    for ch in heb:
-        if "\u05D0" <= ch <= "\u05EA":
-            letters.append([ch, set()])
-        elif letters and unicodedata.combining(ch):
-            letters[-1][1].add(ch)
-    out = []
-    for i, (ch, marks) in enumerate(letters):
-        if ch == "\u05D1" and DAGESH not in marks:      # bet without dagesh
-            out.append("bet")
-        elif ch == "\u05D5":                              # vav
-            vowel_marks = marks & VOWELS
-            prev_has_vowel = i > 0 and bool(letters[i - 1][1] & VOWELS)
-            mater = (marks <= {HOLAM, SHUREQ_MARK}) and not prev_has_vowel and i > 0
-            if not mater:
-                out.append("vav")
-    return out
-
-
-def classical_translit(heb, translit):
-    """Rewrite the v's that come from vav as w. Returns None when nothing changes."""
-    if not translit or "v" not in translit:
-        return None
-    src = v_sources(heb)
-    positions = [i for i, c in enumerate(translit) if c == "v"]
-    if not any(x == "vav" for x in src):
-        return None
-    chars = list(translit)
-    if len(src) == len(positions):
-        for pos, kind in zip(positions, src):
-            if kind == "vav":
-                chars[pos] = "w"
-    elif all(x == "vav" for x in src):
-        chars = ["w" if c == "v" else c for c in chars]
-    else:
-        return None  # mixed sources and counts differ: leave it alone
-    out = "".join(chars)
-    return out if out != translit else None
+def both_translits(raw, fallback="", maqqef=False):
+    """(modern, classical) from a pointed form, falling back to the lexicon's own."""
+    m = transliterate(raw, "modern", maqqef) or fallback
+    c = transliterate(raw, "classical", maqqef) or fallback
+    return m, c
 
 
 # ---------- lexicon ----------
@@ -240,8 +202,8 @@ def load_tbesh(path):
             gloss = cols[6].strip()
             if gloss == "[Obj.]":
                 gloss = "(marks the direct object)"
-            lex[key] = {"heb": strip_cantillation(cols[3].strip()), "translit": cols[4].strip(),
-                        "type": cols[5].strip(), "gloss": gloss}
+            lex[key] = {"heb": strip_cantillation(cols[3].strip()), "heb_raw": cols[3].strip(),
+                        "translit": cols[4].strip(), "type": cols[5].strip(), "gloss": gloss}
     return lex
 
 
@@ -283,6 +245,7 @@ def parse_wlc(wlc_dir):
             morph = attrs.get("morph", "")
             surface = re.sub(r"<[^>]+>", "", m.group(2))  # letters marked large/small/suspended
             verses[cur].append({
+                "raw": surface.replace("/", ""),
                 "h": strip_cantillation(surface.replace("/", "")),
                 "parts": [strip_cantillation(p) for p in surface.split("/")],
                 "pfx": pfx, "key": key, "morph": morph,
@@ -370,24 +333,18 @@ def main(wlc_dir, tbesh_path):
     for p, n in pfx_freq.most_common():
         if p in PREFIXES:
             heb, tr, gloss, typ = PREFIXES[p]
-            entry = {"key": "pfx:" + p, "heb": heb, "translit": tr, "gloss": gloss,
-                     "type": typ, "count": n, "prefix": True}
-            w = classical_translit(heb, tr)
-            if w:
-                entry["translitW"] = w
-            vocab.append(entry)
+            m, c = both_translits(heb, tr)
+            vocab.append({"key": "pfx:" + p, "heb": heb, "translit": m, "translitW": c,
+                          "gloss": gloss, "type": typ, "count": n, "prefix": True})
     for key, n in freq.most_common():
         if n < MIN_COUNT:
             break
         e = lex_lookup(lex, key)
         if not e:
             continue
-        entry = {"key": key, "heb": e["heb"], "translit": e["translit"],
-                 "gloss": e["gloss"], "type": e["type"], "count": n, "name": is_name(key)}
-        w = classical_translit(e["heb"], e["translit"])
-        if w:
-            entry["translitW"] = w
-        vocab.append(entry)
+        m, c = both_translits(e["heb_raw"], e["translit"])
+        vocab.append({"key": key, "heb": e["heb"], "translit": m, "translitW": c,
+                      "gloss": e["gloss"], "type": e["type"], "count": n, "name": is_name(key)})
     # rank: prefixes 1..8, then by frequency
     rank = {}
     r = 0
@@ -443,11 +400,10 @@ def main(wlc_dir, tbesh_path):
                         eng = ph
                         used.add(i)
                         break
-            tr = e["translit"] if e else ""
+            m, c = both_translits(w["raw"], e["translit"] if e else "", w.get("mq", False))
             words.append({
                 "h": w["h"], "parts": w["parts"], "pfx": w["pfx"], "key": w["key"],
-                "gloss": e["gloss"] if e else "", "translit": tr,
-                "translitW": (classical_translit(e.get("heb", ""), tr) if e else None),
+                "gloss": e["gloss"] if e else "", "translit": m, "translitW": c,
                 "morph": decode_morph(w["morph"]), "eng": eng,
                 "mq": w.get("mq", False), "end": w.get("end", False),
                 "name": is_name(w["key"]) if w["key"] else False,
@@ -527,8 +483,8 @@ def main(wlc_dir, tbesh_path):
         for w in v["words"]:
             if w["key"] and w["key"] not in lexicon:
                 e = lex_lookup(lex, w["key"])
-                lexicon[w["key"]] = {"heb": e["heb"] if e else "", "translit": e["translit"] if e else "",
-                                     "translitW": classical_translit(e["heb"], e["translit"]) if e else None,
+                m, c = both_translits(e["heb_raw"], e["translit"]) if e else ("", "")
+                lexicon[w["key"]] = {"heb": e["heb"] if e else "", "translit": m, "translitW": c,
                                      "gloss": e["gloss"] if e else "", "type": e["type"] if e else "",
                                      "count": freq.get(w["key"], 0), "rank": rank.get(w["key"])}
 

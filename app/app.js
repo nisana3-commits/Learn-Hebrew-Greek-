@@ -299,7 +299,29 @@
       <div class="card stack small">
         <label class="opt" for="new-per-day">New words per day <input id="new-per-day" type="number" min="1" max="100" value="${S.settings.newPerDay}" data-act="set-new-per-day"></label>
         <label class="opt" for="highlight-new"><input id="highlight-new" type="checkbox" ${S.settings.highlightNew ? "checked" : ""} data-act="toggle-highlight"> Colour words I have not started yet in rose</label>
-        <label class="opt" for="classical-w"><input id="classical-w" type="checkbox" ${S.settings.classicalW ? "checked" : ""} data-act="toggle-w"> Transliterate vav as w, the classical reading (off: modern Israeli v)</label>
+        <label class="opt" for="classical-w"><input id="classical-w" type="checkbox" ${S.settings.classicalW ? "checked" : ""} data-act="toggle-w"> Classical transliteration (off: modern Israeli with syllable dots)</label>
+        <details class="key"><summary>Transliteration key</summary>
+          <p>Classical follows the SBL academic scheme, with the six soft letters spelled as they sound. Every word is transliterated from its own pointed form in the verse.</p>
+          <table>
+            <tr><th>Letter</th><th>Classical</th><th>Modern</th></tr>
+            <tr><td class="heb">א</td><td>ʾ (catch in the throat)</td><td>silent</td></tr>
+            <tr><td class="heb">בּ / ב</td><td>b / v</td><td>b / v</td></tr>
+            <tr><td class="heb">גּ / ג</td><td>g / gh</td><td>g</td></tr>
+            <tr><td class="heb">דּ / ד</td><td>d / dh (the)</td><td>d</td></tr>
+            <tr><td class="heb">ו</td><td>w</td><td>v</td></tr>
+            <tr><td class="heb">ח</td><td>ḥ (deep in the throat)</td><td>kh</td></tr>
+            <tr><td class="heb">ט</td><td>ṭ (emphatic t)</td><td>t</td></tr>
+            <tr><td class="heb">כּ / כ</td><td>k / kh (Bach)</td><td>k / kh</td></tr>
+            <tr><td class="heb">ע</td><td>ʿ (voiced, in the throat)</td><td>silent</td></tr>
+            <tr><td class="heb">פּ / פ</td><td>p / f</td><td>p / f</td></tr>
+            <tr><td class="heb">צ</td><td>ṣ (emphatic s; ts is accepted)</td><td>ts</td></tr>
+            <tr><td class="heb">ק</td><td>q (far back)</td><td>k</td></tr>
+            <tr><td class="heb">שׁ / שׂ</td><td>š / ś</td><td>sh / s</td></tr>
+            <tr><td class="heb">תּ / ת</td><td>t / th (thin)</td><td>t</td></tr>
+            <tr><td>Vowels</td><td>ā ē ō long, a e i o u short, î ê ô û â written with a vowel letter, ə a quick e</td><td>a e i o u</td></tr>
+            <tr><td>Doubled letter</td><td>held longer (haššāmayim)</td><td>not marked</td></tr>
+          </table>
+        </details>
         <label class="opt" for="auto-speak"><input id="auto-speak" type="checkbox" ${S.settings.autoSpeak ? "checked" : ""} data-act="toggle-speak"> Say each word aloud when it appears or is tapped</label>
         <label class="opt" for="speak-rate">Speaking speed <select id="speak-rate" data-act="set-rate"><option value="0.6" ${S.settings.speakRate == 0.6 ? "selected" : ""}>Slow</option><option value="0.75" ${S.settings.speakRate == 0.75 ? "selected" : ""}>Learner</option><option value="0.9" ${S.settings.speakRate == 0.9 ? "selected" : ""}>Natural</option></select></label>
         <p class="muted">Pronunciation uses the Hebrew voice built into your phone or computer, which speaks modern Israeli Hebrew (vav as v). ${esc(speech.status())}</p>

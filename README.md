@@ -26,9 +26,15 @@ How it teaches:
    health and stewardship, prayer. The list is in `hebrew/curated.json`; edit it and rebuild.
    Verses can be added to your reviews as whole-verse cards.
 
-**Transliteration.** Shown in the classical reading by default, with vav as w (YHWH,
-not YHVH). A setting on Home switches to modern Israeli, with vav as v. Only the letter
-vav changes; bet without a dagesh keeps its v in both.
+**Transliteration.** Every word is transliterated from its own pointed form by
+`hebrew/translit.py`, in two styles. Classical (the default) follows the SBL academic
+scheme with the soft begadkefat letters spelled as they sound: ʾ b/v g/gh d/dh h w z ḥ ṭ
+y k/kh l m n s ʿ p/f ṣ q r ś š t/th, long vowels marked (ā ē ō), vowel letters marked
+(î ê ô û â), vocal shva as ə, and doubled consonants written twice. Modern Israeli
+(a setting on Home) uses v for vav, k for qof, kh for chet, silent alef and ayin, ts
+for tsade, no length or doubling, and syllable dots. The rules for short qamets, vocal
+shva, dagesh and furtive patach are documented at the top of the module, and
+`hebrew/test_translit.py` holds sixty known forms it must reproduce.
 
 **Pronunciation.** Every Hebrew word and verse has a speaker button, and words are read
 aloud as they appear (turn this off on Home). The app uses the Hebrew voice built into
