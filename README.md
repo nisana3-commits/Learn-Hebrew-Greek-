@@ -12,19 +12,23 @@ How it teaches:
 
 1. **Words in frequency order.** The 3,507 Hebrew words that occur five or more times,
    starting with the eight inseparable prefixes (and, the, in, to, from, like...). Together
-   they cover 97 percent of every word in the Hebrew Bible. Each card shows the word,
-   its transliteration, a short gloss, its grammar, how the KJV renders it, and a real verse.
-2. **Spaced repetition.** Grade each card Again, Hard, Good or Easy. Intervals grow the way
-   Anki's do (SM-2 with two learning steps). Ten new words a day by default; change it on Home.
-3. **Real verses, as soon as you can read them.** The reading ladder holds 2,884 short
-   verses ranked by their rarest word. A verse is "ready" when you have started every word
-   in it, so the list grows with your vocabulary. Tap any word for its gloss, grammar,
-   and the KJV phrase that translates it. Reveal the English when you want to check.
-4. **Bible truths, verse by verse.** Fifteen topics, 429 verse slots: the character of God,
-   His promises, creation, the Sabbath, the law, the state of the dead, the second coming,
-   the Messiah, the sanctuary, the great controversy, prophecy, the judgment, the new earth,
-   health and stewardship, prayer. The list is in `hebrew/curated.json`; edit it and rebuild.
-   Verses can be added to your reviews as whole-verse cards.
+   they cover 97 percent of every word in the Hebrew Bible.
+2. **Recall first.** Each study card shows the Hebrew word and asks you to type its
+   meaning before the answer appears. You judge yourself: Missed or Got it. Five dots
+   track your streak on that word.
+3. **Then the word in Scripture.** After every answer the app shows five verses that
+   contain the word, in English, with the word itself in Hebrew where it falls. Every word
+   you have answered right twice before also appears in Hebrew, so the verses turn into
+   Hebrew as your vocabulary grows. Tap any Hebrew word to hear it and see its grammar.
+4. **Spaced repetition.** Intervals grow the way Anki's do (SM-2 with two learning steps)
+   and a miss brings the word back within minutes. Ten new words a day by default.
+5. **Real verses to read.** The reading ladder holds 2,884 short verses ranked by their
+   rarest word; a verse is "ready" when you have started every word in it. Fifteen
+   Bible-truth topics with 429 verse slots (the character of God, His promises, creation,
+   the Sabbath, the law, the state of the dead, the second coming, the Messiah, the
+   sanctuary, the great controversy, prophecy, the judgment, the new earth, health and
+   stewardship, prayer) sit in `hebrew/curated.json`; edit it and rebuild. Whole verses
+   can be added to your reviews as cards.
 
 **Transliteration.** Every word is transliterated from its own pointed form by
 `hebrew/translit.py`, in two styles. Classical (the default) follows the SBL academic

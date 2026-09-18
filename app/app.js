@@ -58,6 +58,7 @@
     const c = S.cards[cardId];
     if (!c) return;
     apply(c, g, Date.now());
+    c.streak = g === 0 ? 0 : (c.streak || 0) + 1;
     logToday("reviews");
     save();
   }
@@ -147,8 +148,8 @@
   function startWord(key, alreadyKnown) {
     if (S.cards[wordCardId(key)]) return;
     const c = newCard("word", key);
-    if (alreadyKnown) { c.state = "review"; c.ivl = 30; c.due = Date.now() + 30 * DAY; c.reps = 1; }
-    else { apply(c, 2, Date.now()); logToday("new"); }
+    if (alreadyKnown) { c.state = "review"; c.ivl = 30; c.due = Date.now() + 30 * DAY; c.reps = 1; c.streak = 3; }
+    else { apply(c, 2, Date.now()); c.streak = 1; logToday("new"); }
     S.cards[wordCardId(key)] = c;
     delete S.deferred[key];
     save();
@@ -165,11 +166,16 @@
     return Object.values(S.cards).filter(c => c.due <= now)
       .sort((a, b) => (a.state === "review") - (b.state === "review") || a.due - b.due);
   }
+  const keyBase = k => (k || "").replace(/[a-z]$/, "");
+  // a word shows up in Hebrew inside English verses once it has been answered right twice
+  const isPracticed = key => { const c = S.cards[wordCardId(key)]; return !!c && ((c.streak || 0) >= 2 || c.state === "review"); };
+  const isMastered = c => (c.streak || 0) >= 3 || (c.state === "review" && c.ivl >= 21);
   function stats() {
     const cards = Object.values(S.cards);
     const words = cards.filter(c => c.kind === "word");
     return {
       words: words.length,
+      mastered: words.filter(isMastered).length,
       mature: words.filter(c => c.state === "review" && c.ivl >= 21).length,
       verses: cards.filter(c => c.kind === "verse").length,
       due: dueCards().length,
@@ -257,11 +263,14 @@
 
   function route() {
     const h = location.hash.replace(/^#/, "") || "home";
-    const [name, arg] = h.split("/");
+    let [name, arg] = h.split("/");
+    if (name === "learn" || name === "review") name = "study";
     current = { tab: name, arg: arg ? decodeURIComponent(arg) : null };
     document.querySelectorAll("#tabs a").forEach(a => a.classList.toggle("active", a.dataset.tab === (name === "verse" || name === "topic" ? "read" : name)));
-    const r = { home: renderHome, learn: renderLearn, review: renderReview, read: renderRead, verse: renderVersePage, topic: renderTopic }[name] || renderHome;
+    const r = { home: renderHome, study: renderStudy, read: renderRead, verse: renderVersePage, topic: renderTopic, words: renderWords }[name] || renderHome;
     view.innerHTML = r(current.arg);
+    if (name !== "study") study.phase = study.phase === "verses" ? "verses" : "ask";
+    const g = document.getElementById("guess"); if (g && study.phase === "ask") g.focus();
     window.scrollTo(0, 0);
     updateBadge();
   }
@@ -279,21 +288,21 @@
     return `
       <div class="stats">
         <div class="stat"><b>${st.due}</b><span>Due now</span></div>
-        <div class="stat"><b>${st.words}</b><span>Words started</span></div>
+        <div class="stat"><b>${st.mastered}</b><span>Mastered</span></div>
         <div class="stat"><b>${st.readable}</b><span>Verses ready</span></div>
       </div>
       <div class="card stack" style="margin-top:14px">
-        <div class="progress"><i style="width:${pct}%"></i><b>${st.words} of ${VOCAB.length} words</b></div>
-        <p class="small muted">Words are ordered by how often they appear in the Hebrew Bible. The first few hundred cover most of every page. Verses unlock in Read as soon as you know their words.</p>
+        <div class="progress"><i style="width:${pct}%"></i><b>${st.words} of ${VOCAB.length} words started</b></div>
+        <p class="small muted">Each study card asks you for the meaning first, then shows the word inside real verses. Words you have answered right twice start appearing in Hebrew inside every English verse, so Scripture turns into Hebrew as you go.</p>
         <div class="row">
-          <a class="btn primary" href="#review">Review${st.due ? " (" + st.due + ")" : ""}</a>
-          <a class="btn" href="#learn">Learn new words${left ? " (" + left + " left today)" : ""}</a>
+          <a class="btn primary" href="#study">Study${st.due ? " (" + st.due + " due)" : left ? " (" + left + " new)" : ""}</a>
           <a class="btn" href="#read">Read</a>
+          <a class="btn" href="#words">All words</a>
         </div>
       </div>
       <div class="section-title">Today</div>
       <div class="card small">
-        ${(S.log[today()] || { new: 0, reviews: 0 }).new} new words, ${(S.log[today()] || { new: 0, reviews: 0 }).reviews} reviews. ${st.mature} words mature (interval of three weeks or more). ${st.verses} verses in your reviews.
+        ${(S.log[today()] || { new: 0, reviews: 0 }).new} new words, ${(S.log[today()] || { new: 0, reviews: 0 }).reviews} answers. ${st.words} words started, ${st.mastered} mastered (three right in a row). ${st.verses} verses in your reviews.
       </div>
       <div class="section-title">Settings</div>
       <div class="card stack small">
@@ -337,92 +346,168 @@
       <p class="small muted">Hebrew text: Westminster Leningrad Codex with Strong's numbers and morphology (OpenScriptures, CC BY 4.0). Glosses: Tyndale House STEPBible TBESH (CC BY 4.0). English: King James Version.</p>`;
   }
 
-  function renderLearn() {
-    const left = newLeftToday();
-    const next = nextNewWords(1)[0];
-    if (!next) return `<div class="card center"><h2>Every word started</h2><p>You have started all ${VOCAB.length} words in the list. Keep reviewing.</p></div>`;
-    if (left === 0) {
-      return `<div class="card center stack"><h2>Done for today</h2><p class="muted">You have started ${S.settings.newPerDay} new words today. Review what is due, or read. Raise the daily limit on Home if you want more.</p>
-        <div class="row" style="justify-content:center"><a class="btn primary" href="#review">Review</a><a class="btn" href="#read">Read</a></div>
-        <button class="btn quiet sm" data-act="one-more">Show one more anyway</button></div>`;
+  // ---------- study loop: ask, reveal, verses ----------
+  let study = { id: null, phase: "ask", guess: "", shuffle: 1, isNew: false };
+  function nextStudyItem() {
+    const fromPool = pool => {
+      if (!pool.length) return null;
+      const c = pool.find(x => x.kind + ":" + x.id !== study.last) || pool[0];
+      return { id: c.kind + ":" + c.id, kind: c.kind, key: c.kind === "word" ? c.id : null, verse: c.kind === "verse" ? c.id : null, isNew: false };
+    };
+    const due = fromPool(dueCards());
+    if (due) return due;
+    if (newLeftToday() > 0) {
+      const v = nextNewWords(1)[0];
+      if (v) return { id: "new:" + v.key, kind: "word", key: v.key, isNew: true };
     }
-    autoSpeak(next.heb);
-    return wordCard(next, left);
+    return fromPool(dueCards(20 * MIN).filter(c => c.state === "learn"));
   }
-  function wordCard(v, left) {
-    const ex = (INDEX[v.key] || [])[0];
-    const exv = ex ? VERSES[ex] : null;
-    let exHtml = "";
-    if (exv) {
-      const idx = exv.words.findIndex(w => wordKeys(w).includes(v.key) || (w.key === v.key));
-      exHtml = `<div class="example">
-        <div class="small muted">Example, ${esc(exv.ref)}</div>
-        <div class="heb heb-verse hide-new" data-verse="${exv.id}">${exv.words.map((w, i) => renderWord(w, i, { hl: idx })).join("")}</div>
-        <div class="small">${esc(exv.kjv)}</div>
-        <div id="ex-panel"></div>
-      </div>`;
+  function seededPick(arr, n, seed) {
+    let s = seed * 9301 + 49297;
+    const rand = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a.slice(0, n);
+  }
+  const wordHas = (w, key) => key.startsWith("pfx:") ? w.pfx.includes(key.slice(4)) : keyBase(w.key) === keyBase(key);
+  function versesForWord(key) {
+    return (INDEX[key] || []).filter(id => !VERSES[id].aramaic && VERSES[id].seg.some(([, wi]) => wi != null && wordHas(VERSES[id].words[wi], key)));
+  }
+  // English verse with the target word, and every practiced word, shown in Hebrew
+  function renderSwappedVerse(v, targetKey) {
+    let swapped = 0;
+    const html = v.seg.map(([t, wi]) => {
+      if (wi == null) return esc(t);
+      const w = v.words[wi];
+      const isTarget = wordHas(w, targetKey);
+      const keys = w.pfx.map(p => "pfx:" + p).concat(w.key ? [w.key] : []);
+      const practiced = keys.length > 0 && keys.every(isPracticed);
+      if (!isTarget && !practiced) return esc(t);
+      if (!isTarget) swapped++;
+      return `<span class="w heb heb-inline${isTarget ? " target" : ""}" data-i="${wi}" title="${esc(t)}">${esc(w.h)}</span>`;
+    }).join("");
+    return { html, swapped };
+  }
+  function dots(c) {
+    const s = c ? (c.streak || 0) : 0;
+    const cls = s >= 5 ? "gold" : s >= 3 ? "ok" : s >= 1 ? "on" : "";
+    return `<div class="dots" aria-label="${s} in a row">${[0, 1, 2, 3, 4].map(i => `<i class="${s > i ? cls : ""}"></i>`).join("")}</div>`;
+  }
+  function renderStudy() {
+    if (study.phase === "verses" && study.key) return renderVersesPhase();
+    const item = nextStudyItem();
+    if (!item) return renderCaughtUp();
+    if (study.id !== item.id) study = { id: item.id, phase: "ask", guess: "", shuffle: 1, isNew: item.isNew, key: item.key, verse: item.verse, last: study.last };
+    const due = dueCards().length;
+    const left = newLeftToday();
+    const head = (label) => `<div class="row between small muted"><span>${due} due${study.isNew ? " · new word" : " · " + label}</span><span>${left} new left today</span></div>`;
+    if (item.kind === "verse") {
+      const v = VERSES[item.verse];
+      if (!v) { delete S.cards[item.id]; save(); return renderStudy(); }
+      return head("verse") + `<div class="card">
+        <div class="row between small muted"><span>${esc(v.ref)} · tap a word for its meaning</span>${speakBtn(v.words.map(w => w.h).join(" "), "Read the verse aloud")}</div>
+        ${renderVerse(v)}
+        <div id="vpanel"></div>
+        ${study.phase === "reveal" ? kjvBlock(v) : ""}
+      </div>` + (study.phase === "reveal" ? verdictButtons() : `<button class="btn primary block" data-act="reveal">Show English</button>`);
     }
-    return `
-      <div class="row between small muted"><span>Word #${v.rank} of ${VOCAB.length}</span><span>${left} more today</span></div>
-      <div class="card">
-        <div class="heb heb-big">${esc(v.heb)}</div>
-        <div class="center translit">${esc(tr(v))} ${speakBtn(v.heb, "Pronounce " + tr(v))}</div>
-        <div class="center gloss" style="margin-top:8px">${esc(v.gloss)}</div>
-        <div class="center small muted">${esc(typeLabel(v.type))}${v.prefix ? " (inseparable prefix)" : ""} · ${v.count.toLocaleString()}× in the Hebrew Bible</div>
-        ${v.kjv ? `<div class="center small" style="margin-top:6px">KJV: ${esc(v.kjv.join(", "))}</div>` : ""}
-        ${exHtml}
-      </div>
-      <div class="row">
-        <button class="btn primary" data-act="start-word" data-key="${esc(v.key)}">Start learning</button>
-        <button class="btn" data-act="know-word" data-key="${esc(v.key)}">I already know it</button>
-        <button class="btn quiet" data-act="defer-word" data-key="${esc(v.key)}">Later</button>
+    const v = VOCAB_BY_KEY[item.key] || Object.assign({ key: item.key, heb: "", gloss: "", translit: "", type: "", count: 0 }, LEX[item.key] || {});
+    const card = S.cards[wordCardId(item.key)];
+    if (study.phase === "ask") autoSpeak(v.heb);
+    const guessLine = study.guess ? `<div class="small muted">Your guess: <em>${esc(study.guess)}</em></div>` : "";
+    const ask = `<div class="ask">
+        <label class="small muted center" for="guess">What does it mean?</label>
+        <div class="row nowrap">
+          <input id="guess" type="text" autocomplete="off" autocapitalize="off" placeholder="Type the English meaning" value="${esc(study.guess)}" data-act="guess">
+          <button class="btn primary" data-act="submit-guess" aria-label="Check">→</button>
+        </div>
+        <button class="btn quiet sm" data-act="reveal">Show answer</button>
       </div>`;
+    const reveal = `<div class="answer">
+        <div class="small muted eyebrow-label">Answer</div>
+        <div class="gloss">${esc(v.gloss)}</div>
+        <div class="small muted">${esc(typeLabel(v.type))}${v.kjv ? " · KJV: " + esc(v.kjv.slice(0, 3).join(", ")) : ""} · ${(v.count || 0).toLocaleString()}× in the Hebrew Bible</div>
+        ${guessLine}
+      </div>` + verdictButtons();
+    return head(card && card.state === "review" ? "review" : "learning") + `<div class="card study">
+        <div class="small muted eyebrow-label">${esc(keyBase(item.key).startsWith("pfx") ? "prefix" : keyBase(item.key))}${v.rank ? " · word #" + v.rank : ""}</div>
+        <div class="heb heb-big">${esc(v.heb)}</div>
+        <div class="center translit">${esc(tr(v))} ${speakBtn(v.heb, "Pronounce")}</div>
+        ${dots(card)}
+        ${study.phase === "ask" ? ask : reveal}
+      </div>`;
+  }
+  function verdictButtons() {
+    return `<div class="verdict">
+      <button class="btn missed" data-act="verdict" data-g="0">Missed</button>
+      <button class="btn got" data-act="verdict" data-g="2">Got it</button>
+    </div>`;
+  }
+  function renderVersesPhase() {
+    const key = study.key;
+    const v = VOCAB_BY_KEY[key] || LEX[key] || {};
+    const all = versesForWord(key).slice(0, 24);
+    const pick = seededPick(all, 5, study.shuffle);
+    let anySwapped = false;
+    const list = pick.map(id => {
+      const vs = VERSES[id];
+      const { html, swapped } = renderSwappedVerse(vs, key);
+      if (swapped) anySwapped = true;
+      return `<div class="card verse-en" data-verse="${id}">
+        <div class="small muted eyebrow-label">${esc(vs.ref)}</div>
+        <div class="en">${html}</div>
+        <div class="vpanel-slot"></div>
+      </div>`;
+    }).join("");
+    return `<div class="center" style="margin-bottom:12px">
+        <div class="heb heb-big">${esc(v.heb)}</div>
+        <div class="gloss center">${esc(v.gloss)}</div>
+        <div class="small muted">See how this word is used in Scripture. Tap a Hebrew word to hear it.</div>
+      </div>
+      ${list || `<div class="card small muted">No verses in this app carry this word on its own yet.</div>`}
+      ${anySwapped ? `<p class="small muted center">Words you have practiced appear in Hebrew too.</p>` : ""}
+      <div class="row" style="justify-content:center">
+        ${all.length > 5 ? `<button class="btn" data-act="shuffle-verses">Different verses</button>` : ""}
+        <button class="btn primary" data-act="continue">Continue</button>
+      </div>`;
+  }
+  function renderCaughtUp() {
+    const all = Object.values(S.cards);
+    const next = all.length ? Math.min(...all.map(x => x.due)) - Date.now() : null;
+    const st = stats();
+    const noNew = newLeftToday() === 0 && nextNewWords(1).length > 0;
+    return `<div class="card center stack">
+      <div class="heb heb-big">שָׁלוֹם</div>
+      <h2>All caught up</h2>
+      <p class="muted">${all.length ? "Next review in " + fmtDelta(Math.max(next, MIN)) + "." : "Your first words will appear here."}${noNew ? " You have started today's " + S.settings.newPerDay + " new words." : ""}</p>
+      <div class="stats"><div class="stat"><b>${st.mastered}</b><span>Mastered</span></div><div class="stat"><b>${st.words - st.mastered}</b><span>In progress</span></div><div class="stat"><b>${st.readable}</b><span>Verses ready</span></div></div>
+      <div class="row" style="justify-content:center">
+        <a class="btn" href="#read">Read</a>
+        ${noNew ? `<button class="btn quiet sm" data-act="one-more">Study one more new word</button>` : ""}
+      </div>
+    </div>`;
   }
 
-  let reviewState = { showing: null, revealed: false };
-  function renderReview() {
-    const q = dueCards();
-    const soon = dueCards(20 * MIN).filter(c => c.state === "learn");
-    const c = q[0] || soon[0];
-    if (!c) {
-      const all = Object.values(S.cards);
-      const next = all.length ? Math.min(...all.map(x => x.due)) - Date.now() : null;
-      return `<div class="card center stack"><h2>Nothing due</h2>
-        <p class="muted">${all.length ? "Next card in " + fmtDelta(Math.max(next, MIN)) + "." : "Start some words in Learn and they will show up here."}</p>
-        <div class="row" style="justify-content:center"><a class="btn primary" href="#learn">Learn new words</a><a class="btn" href="#read">Read</a></div></div>`;
-    }
-    const id = c.kind + ":" + c.id;
-    if (reviewState.showing !== id) reviewState = { showing: id, revealed: false };
-    const head = `<div class="row between small muted"><span>${q.length} due${soon.length && !q.length ? " (learning ahead)" : ""}</span><span>${c.kind === "verse" ? "Verse" : "Word"} · ${c.state === "review" ? "review" : "learning"}</span></div>`;
-    const grades = `<div class="grades">
-      <button class="btn again" data-act="grade" data-g="0">Again<small>${fmtDelta(preview(c, 0))}</small></button>
-      <button class="btn" data-act="grade" data-g="1">Hard<small>${fmtDelta(preview(c, 1))}</small></button>
-      <button class="btn" data-act="grade" data-g="2">Good<small>${fmtDelta(preview(c, 2))}</small></button>
-      <button class="btn easy" data-act="grade" data-g="3">Easy<small>${fmtDelta(preview(c, 3))}</small></button>
-    </div>`;
-    if (c.kind === "word") {
-      const v = VOCAB_BY_KEY[c.id] || Object.assign({ key: c.id, heb: "", gloss: "", translit: "", type: "", count: 0 }, LEX[c.id] || {});
-      const ex = (INDEX[c.id] || [])[0];
-      if (reviewState.revealed) autoSpeak(v.heb);
-      return head + `<div class="card flashcard">
-        <div class="heb heb-big">${esc(v.heb)}</div>
-        <div class="center">${speakBtn(v.heb, "Pronounce")}</div>
-        ${reviewState.revealed ? `<div class="back">
-          <div class="translit">${esc(tr(v))}</div>
-          <div class="gloss">${esc(v.gloss)}</div>
-          <div class="small muted">${esc(typeLabel(v.type))}${v.kjv ? " · KJV: " + esc(v.kjv.slice(0, 3).join(", ")) : ""}</div>
-          ${ex ? `<div class="example"><div class="heb heb-small hide-new" style="text-align:center">${esc(VERSES[ex].words.map(w => w.h).join(" "))}</div><div class="small muted">${esc(VERSES[ex].ref)}: ${esc(VERSES[ex].kjv)}</div></div>` : ""}
-        </div>` : ""}
-      </div>` + (reviewState.revealed ? grades : `<button class="btn primary block" data-act="reveal">Show meaning</button>`);
-    }
-    const v = VERSES[c.id];
-    if (!v) { delete S.cards[id]; save(); return renderReview(); }
-    return head + `<div class="card">
-      <div class="row between small muted"><span>${esc(v.ref)} · tap a word for its meaning</span>${speakBtn(v.words.map(w => w.h).join(" "), "Read the verse aloud")}</div>
-      ${renderVerse(v)}
-      <div id="vpanel"></div>
-      ${reviewState.revealed ? kjvBlock(v) : ""}
-    </div>` + (reviewState.revealed ? grades : `<button class="btn primary block" data-act="reveal">Show English</button>`);
+  function renderWords() {
+    const q = (study.wordsQuery || "").toLowerCase();
+    const status = key => {
+      const c = S.cards[wordCardId(key)];
+      if (!c) return ["", "not started"];
+      if (isMastered(c)) return ["gold", "mastered"];
+      if (c.due <= Date.now()) return ["due", "due now"];
+      if (c.state === "review") return ["ok", "reviewing"];
+      return ["on", "learning"];
+    };
+    let rows = VOCAB;
+    if (q) rows = rows.filter(v => v.gloss.toLowerCase().includes(q) || tr(v).toLowerCase().includes(q) || v.heb.includes(q) || v.key.toLowerCase() === q);
+    const started = rows.filter(v => S.cards[wordCardId(v.key)]);
+    const upcoming = rows.filter(v => !S.cards[wordCardId(v.key)]).slice(0, q ? 60 : 30);
+    const row = v => { const [cls, label] = status(v.key); const c = S.cards[wordCardId(v.key)]; return `<li data-act="word-sheet" data-key="${esc(v.key)}"><i class="dot ${cls}" title="${label}"></i><span class="heb heb-small">${esc(v.heb)}</span><span class="small">${esc(v.gloss)}</span><span class="small muted right">${c && c.streak ? c.streak + " ✦" : "#" + v.rank}</span></li>`; };
+    return `<div class="section-title">All words</div>
+      <input id="words-q" type="search" placeholder="Search meaning, sound, or Hebrew" value="${esc(study.wordsQuery || "")}" data-act="words-query" class="search">
+      <p class="small muted">${VOCAB.length.toLocaleString()} words in frequency order. ${started.length} started.</p>
+      ${started.length ? `<div class="section-title">Started (${started.length})</div><ul class="list words">${started.map(row).join("")}</ul>` : ""}
+      <div class="section-title">Next up</div><ul class="list words">${upcoming.map(row).join("")}</ul>`;
   }
 
   function renderRead() {
@@ -507,11 +592,12 @@
     const wEl = e.target.closest(".w");
     if (wEl) {
       const container = wEl.closest("[data-verse]");
+      if (!container) return;
       const v = VERSES[container.dataset.verse];
       const i = +wEl.dataset.i;
       container.querySelectorAll(".w.active").forEach(x => x.classList.remove("active"));
       wEl.classList.add("active");
-      const panel = container.parentElement.querySelector("#vpanel, #ex-panel") || container.nextElementSibling;
+      const panel = container.querySelector(".vpanel-slot") || container.parentElement.querySelector("#vpanel, #ex-panel") || container.nextElementSibling;
       if (panel) panel.innerHTML = wordPanel(v, i);
       if (S.settings.autoSpeak) speech.say(v.words[i].h);
       return;
@@ -527,14 +613,26 @@
       }
       return;
     }
-    if (act === "start-word") { startWord(el.dataset.key, false); route(); }
-    else if (act === "know-word") { startWord(el.dataset.key, true); route(); }
-    else if (act === "defer-word") { S.deferred[el.dataset.key] = Date.now(); save(); route(); }
-    else if (act === "one-more") { S.settings.newPerDay++; save(); route(); }
+    if (act === "one-more") { S.settings.newPerDay++; save(); route(); }
     else if (act === "learn-word") { startWord(el.dataset.key, false); sheet.hidden = true; route(); }
     else if (act === "word-sheet") { openWordSheet(el.dataset.key); }
-    else if (act === "reveal") { reviewState.revealed = true; route(); }
-    else if (act === "grade") { grade(reviewState.showing, +el.dataset.g); reviewState = { showing: null, revealed: false }; route(); }
+    else if (act === "submit-guess" || act === "reveal") {
+      const g = document.getElementById("guess"); if (g) study.guess = g.value.trim();
+      if (act === "submit-guess" && !study.guess) { g.classList.add("shake"); setTimeout(() => g.classList.remove("shake"), 400); return; }
+      study.phase = "reveal"; route();
+    }
+    else if (act === "verdict") {
+      const g = +el.dataset.g;
+      if (study.isNew) {
+        const c = newCard("word", study.key); apply(c, g, Date.now()); c.streak = g === 0 ? 0 : 1; logToday("new");
+        S.cards[wordCardId(study.key)] = c; delete S.deferred[study.key]; save();
+      } else grade(study.id, g);
+      study.last = study.id;
+      if (study.key) { study.phase = "verses"; study.shuffle = 1; } else study.phase = "ask";
+      route();
+    }
+    else if (act === "shuffle-verses") { study.shuffle++; route(); }
+    else if (act === "continue") { study.phase = "ask"; study.id = null; route(); }
     else if (act === "open-verse") { sheet.hidden = true; location.hash = "#verse/" + el.dataset.id; }
     else if (act === "open-topic") { location.hash = "#topic/" + el.dataset.id; }
     else if (act === "reveal-verse") { versePage.revealed = true; route(); }
@@ -570,6 +668,15 @@
       if (el.dataset.confirm) { S = defaults(); save(); route(); }
       else { el.dataset.confirm = "1"; el.textContent = "Tap again to erase all progress"; }
     }
+  });
+  document.body.addEventListener("input", e => {
+    const el = e.target.closest("[data-act]");
+    if (!el) return;
+    if (el.dataset.act === "guess") study.guess = el.value;
+    else if (el.dataset.act === "words-query") { study.wordsQuery = el.value; const ul = document.querySelectorAll(".list.words"); if (ul.length) { const pos = window.scrollY; view.innerHTML = renderWords(); const q = document.getElementById("words-q"); q.focus(); q.setSelectionRange(q.value.length, q.value.length); window.scrollTo(0, pos); } }
+  });
+  document.body.addEventListener("keydown", e => {
+    if (e.key === "Enter" && e.target.id === "guess") { e.preventDefault(); document.querySelector("[data-act=submit-guess]").click(); }
   });
   document.body.addEventListener("change", e => {
     const el = e.target.closest("[data-act]");

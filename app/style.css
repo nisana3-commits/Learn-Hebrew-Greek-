@@ -238,3 +238,36 @@ select { font: inherit; padding: 6px 10px; border: 1.5px solid var(--line); bord
 .key table { border-collapse: collapse; width: 100%; margin-top: 8px; font-size: 13px; }
 .key th, .key td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
 .key td.heb { font-size: 18px; text-align: left; direction: rtl; }
+
+/* study loop */
+.card.study { text-align: center; }
+.eyebrow-label { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; }
+.dots { display: flex; justify-content: center; gap: 7px; margin: 10px 0 16px; }
+.dots i { width: 10px; height: 10px; border-radius: 50%; background: var(--recessed); border: 1px solid var(--line); transition: background 300ms; }
+.dots i.on { background: var(--accent-prefix-new); border-color: transparent; }
+.dots i.ok { background: var(--ok); border-color: transparent; }
+.dots i.gold { background: var(--gold-400); border-color: transparent; }
+.ask { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+.ask label { display: block; }
+.row.nowrap { flex-wrap: nowrap; }
+input#guess { flex: 1; min-width: 0; font: 18px var(--font-text); padding: 10px 14px; border: 1.5px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--text); }
+input#guess.shake { animation: shake 400ms; }
+@keyframes shake { 0%, 100% { transform: translateX(0); } 25%, 75% { transform: translateX(-6px); } 50% { transform: translateX(6px); } }
+@media (prefers-reduced-motion: reduce) { input#guess.shake { animation: none; } }
+.answer { border-top: 1px dashed var(--line); margin-top: 6px; padding-top: 14px; display: flex; flex-direction: column; gap: 6px; }
+.verdict { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.verdict .btn { padding: 14px; }
+.verdict .missed { border-color: var(--accent); color: var(--accent); }
+.verdict .got { background: var(--ok); border-color: var(--ok); color: #fff; }
+.verse-en .en { font-size: 17px; line-height: 2; }
+.heb-inline { font-size: 1.35em; padding: 0 3px; border-bottom: 1px solid var(--accent-prefix-new); }
+.heb-inline.target { background: var(--accent-soft); border-radius: 6px; border-bottom: 0; }
+.list.words li { gap: 10px; }
+.list.words .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--recessed); border: 1px solid var(--line); flex-shrink: 0; }
+.list.words .dot.on { background: var(--accent-prefix-new); border-color: transparent; }
+.list.words .dot.ok { background: var(--ok); border-color: transparent; }
+.list.words .dot.gold { background: var(--gold-400); border-color: transparent; }
+.list.words .dot.due { background: var(--accent); border-color: transparent; }
+.list.words .heb { flex: 0 0 auto; min-width: 90px; text-align: right; }
+.list.words .right { margin-left: auto; white-space: nowrap; }
+.search { width: 100%; font: 16px var(--font-text); padding: 10px 14px; border: 1.5px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--text); margin-bottom: 8px; }

@@ -280,10 +280,12 @@ def kjv_plain(tagged):
     return re.sub(r"\{[^}]*\}", "", tagged)
 
 
+PHRASE_RE = re.compile(r"([^{}]*?)([\w\[][^{}]*?)\{([^}]*)\}")
+
+
 def kjv_phrases(tagged):
     """list of (phrase, [numbers]) in order"""
-    return [(m.group(2).strip(), m.group(3).split())
-            for m in re.finditer(r"([^{}]*?)([\w\[][^{}]*?)\{([^}]*)\}", tagged)]
+    return [(m.group(2).strip(), m.group(3).split()) for m in PHRASE_RE.finditer(tagged)]
 
 
 # ---------- reference parsing ----------
@@ -386,6 +388,7 @@ def main(wlc_dir, tbesh_path):
         tagged = kjv.get(kref, "")
         phrases = kjv_phrases(tagged)
         used = set()
+        phrase_word = {}
         words = []
         for w in verses[osis]:
             e = lex_lookup(lex, w["key"]) if w["key"] else None
@@ -399,6 +402,7 @@ def main(wlc_dir, tbesh_path):
                     if i not in used and base in nums:
                         eng = ph
                         used.add(i)
+                        phrase_word[i] = len(words)
                         break
             m, c = both_translits(w["raw"], e["translit"] if e else "", w.get("mq", False))
             words.append({
@@ -408,9 +412,20 @@ def main(wlc_dir, tbesh_path):
                 "mq": w.get("mq", False), "end": w.get("end", False),
                 "name": is_name(w["key"]) if w["key"] else False,
             })
+        # KJV text as segments: [text, index of the Hebrew word it translates or None]
+        seg = []
+        pos = 0
+        for i, m in enumerate(PHRASE_RE.finditer(tagged)):
+            if m.group(1):
+                seg.append([m.group(1), None])
+            seg.append([m.group(2), phrase_word.get(i)])
+            pos = m.end()
+        tail = kjv_plain(tagged[pos:])
+        if tail:
+            seg.append([tail, None])
         lvl, unknown = verse_level(osis)
         b, c, v = osis.split(".")
-        return {"id": osis, "ref": f"{OSIS_TO_KJV[b]} {c}:{v}",
+        return {"id": osis, "ref": f"{OSIS_TO_KJV[b]} {c}:{v}", "seg": seg,
                 "kjvRef": kref if kref != f"{OSIS_TO_KJV[b]} {c}:{v}" else None,
                 "kjv": kjv_plain(tagged), "words": words, "level": lvl,
                 "unknown": unknown, "aramaic": any(w["morph"].startswith("A") for w in verses[osis]),
